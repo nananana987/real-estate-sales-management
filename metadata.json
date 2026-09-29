@@ -1,0 +1,6 @@
+{
+  "name": "不動産販売・原価管理システム",
+  "description": "顧問先の不動産仕入・付随費用・売上・期末棚卸原価管理および会計科目別突合システム",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

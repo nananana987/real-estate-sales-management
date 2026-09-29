@@ -1,0 +1,121 @@
+@import "tailwindcss";
+
+@media print {
+  /* Hide non-printable elements */
+  .no-print,
+  .no-print *,
+  header,
+  nav,
+  aside,
+  #kpi-overview-ribbon,
+  #property-filter-bar,
+  .action-buttons-column,
+  button,
+  input,
+  select {
+    display: none !important;
+  }
+
+  /* Page setup for clean printable tables */
+  @page {
+    size: landscape;
+    margin: 8mm 6mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 9pt !important;
+    line-height: 1.2 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  main {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Reset truncate / max-w restrictions during print so full text is visible */
+  .print-text-full,
+  .print-text-full * {
+    max-width: none !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+  }
+
+  /* Print-only container display */
+  .print-only {
+    display: block !important;
+  }
+
+  .print-flex {
+    display: flex !important;
+  }
+
+  /* Table styling */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tfoot {
+    display: table-footer-group !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  th,
+  td {
+    padding: 4px 6px !important;
+    border: 1px solid #cbd5e1 !important;
+    font-size: 8.5pt !important;
+  }
+
+  th {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+    font-weight: 700 !important;
+  }
+
+  /* Ensure date and code columns never wrap to multiple lines in print */
+  .col-date,
+  td.col-date,
+  th.col-date {
+    white-space: nowrap !important;
+    min-width: 86px !important;
+    width: 90px !important;
+    letter-spacing: -0.01em !important;
+  }
+
+  /* When modal is open and printing modal */
+  #property-detail-modal-backdrop {
+    position: static !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  #property-detail-modal-container {
+    max-height: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+}
