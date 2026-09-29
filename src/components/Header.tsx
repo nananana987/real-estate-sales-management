@@ -18,8 +18,9 @@ import {
   Laptop,
   Settings,
 } from 'lucide-react';
-import { FiscalYear, CompanyInfo, Property } from '../types';
+import { FiscalYear, CompanyInfo, Property, FileSaveStatus } from '../types';
 import { exportBackupJSON, importBackupJSON } from '../utils/storage';
+import { LocalFileStatusWidget } from './LocalFileStatusWidget';
 
 interface HeaderProps {
   currentFY: FiscalYear;
@@ -40,6 +41,16 @@ interface HeaderProps {
   isOnline: boolean;
   isInIframe?: boolean;
   onOpenPwaModal: () => void;
+  // Local File System Props
+  localFileName: string | null;
+  localFileStatus: FileSaveStatus;
+  localFileLastSavedAt: Date | null;
+  isLocalFileSupported: boolean;
+  onOpenLocalFile: () => void;
+  onCreateNewLocalFile: () => void;
+  onRequestLocalFilePermission: () => void;
+  onOpenLocalFileManagerModal: () => void;
+  onSaveLocalFileNow: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -61,6 +72,15 @@ export const Header: React.FC<HeaderProps> = ({
   isOnline,
   isInIframe = false,
   onOpenPwaModal,
+  localFileName,
+  localFileStatus,
+  localFileLastSavedAt,
+  isLocalFileSupported,
+  onOpenLocalFile,
+  onCreateNewLocalFile,
+  onRequestLocalFilePermission,
+  onOpenLocalFileManagerModal,
+  onSaveLocalFileNow,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -155,8 +175,21 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Fiscal Year Selector & Global Actions */}
+          {/* Local File Storage, Fiscal Year & Global Actions */}
           <div className="flex items-center space-x-2">
+            {/* PC Local File Storage Status & Action Widget */}
+            <LocalFileStatusWidget
+              fileName={localFileName}
+              status={localFileStatus}
+              lastSavedAt={localFileLastSavedAt}
+              isSupported={isLocalFileSupported}
+              onOpenFile={onOpenLocalFile}
+              onCreateNewFile={onCreateNewLocalFile}
+              onRequestPermission={onRequestLocalFilePermission}
+              onOpenModal={onOpenLocalFileManagerModal}
+              onSaveNow={onSaveLocalFileNow}
+            />
+
             {/* Fiscal Year Dropdown */}
             <div className="relative inline-flex items-center bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1 text-slate-800 transition-colors shadow-2xs">
               <Calendar className="w-3.5 h-3.5 text-blue-600 mr-1.5 shrink-0" />
@@ -206,12 +239,20 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="hidden sm:inline">CSV取込</span>
             </button>
 
-            {/* Data Management Menu */}
+            {/* File & Backup Menu */}
             <div className="flex items-center space-x-1 border-l border-slate-200 pl-2">
               <button
                 type="button"
-                onClick={handleExportBackup}
+                onClick={onOpenLocalFileManagerModal}
                 className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
+                title="ファイル保存・バックアップ設定"
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={handleExportBackup}
+                className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors cursor-pointer hidden md:inline-block"
                 title="バックアップ保存 (JSON)"
               >
                 <Download className="w-3.5 h-3.5" />
@@ -219,7 +260,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={handleImportClick}
-                className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
+                className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors cursor-pointer hidden md:inline-block"
                 title="バックアップ復元 (JSON)"
               >
                 <Upload className="w-3.5 h-3.5" />

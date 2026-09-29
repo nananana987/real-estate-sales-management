@@ -192,3 +192,22 @@ export interface PropertyFinancials {
   isSoldInCurrentPeriod: boolean; // 当期売却物件か (一部含む)
   isInventoryInCurrentPeriod: boolean; // 当期末棚卸物件か
 }
+
+export interface AppDataFile {
+  version: string;
+  appName?: string;
+  lastModified?: string;
+  companyInfo: CompanyInfo;
+  fiscalYears: FiscalYear[];
+  selectedFiscalYearId?: string;
+  properties: Property[];
+}
+
+export type FileSaveStatus =
+  | 'saved'              // ファイルへ保存済み
+  | 'saving'             // ファイルへ書き込み中...
+  | 'unsaved'            // 未保存の変更あり（デバウンス待機中）
+  | 'no_file'            // ファイル未選択（ブラウザ内一時動作中）
+  | 'permission_needed'  // 再接続の許可が必要
+  | 'error'              // 保存エラー
+  | 'unsupported';       // File System Access API非対応ブラウザ

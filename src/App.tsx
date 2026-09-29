@@ -45,7 +45,11 @@ import { FiscalYearModal } from './components/FiscalYearModal';
 import { CompanyModal } from './components/CompanyModal';
 import { CsvImportModal } from './components/CsvImportModal';
 import { PwaInstallModal } from './components/PwaInstallModal';
+import { LocalFileManagerModal } from './components/LocalFileManagerModal';
+import { LocalFileNotificationBanner } from './components/LocalFileNotificationBanner';
 import { usePwa } from './utils/pwa';
+import { useLocalFileStore } from './utils/useLocalFileStore';
+import { AppDataFile } from './types';
 
 export default function App() {
   // PWA Support & Offline Status
@@ -57,6 +61,43 @@ export default function App() {
   const [fiscalYears, setFiscalYears] = useState<FiscalYear[]>(() => loadFiscalYears());
   const [selectedFYId, setSelectedFYId] = useState<string>(() => loadSelectedFiscalYearId());
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(() => loadCompanyInfo());
+  const [isLocalFileManagerOpen, setIsLocalFileManagerOpen] = useState(false);
+
+  // Callback when data is restored or loaded from PC local file
+  const handleDataLoadedFromFile = React.useCallback((data: AppDataFile) => {
+    if (data.properties) setProperties(data.properties);
+    if (data.fiscalYears) setFiscalYears(data.fiscalYears);
+    if (data.companyInfo) setCompanyInfo(data.companyInfo);
+    if (data.selectedFiscalYearId) {
+      setSelectedFYId(data.selectedFiscalYearId);
+    } else if (data.fiscalYears && data.fiscalYears.length > 0) {
+      const current = data.fiscalYears.find(y => y.isCurrent) || data.fiscalYears[0];
+      setSelectedFYId(current.id);
+    }
+  }, []);
+
+  // Local File System Access & Auto-save Hook
+  const {
+    fileName: localFileName,
+    status: localFileStatus,
+    lastSavedAt: localFileLastSavedAt,
+    errorMessage: localFileErrorMessage,
+    isSupported: isLocalFileSupported,
+    openFile: handleOpenLocalFile,
+    createNewFile: handleCreateNewLocalFile,
+    saveAsNewFile: handleSaveAsNewLocalFile,
+    requestPermissionAndReconnect: handleRequestLocalFilePermission,
+    disconnectFile: handleDisconnectLocalFile,
+    saveNow: handleSaveLocalFileNow,
+    exportManualDownload: handleExportManualDownload,
+    importManualFile: handleImportManualFile,
+  } = useLocalFileStore({
+    properties,
+    fiscalYears,
+    selectedFYId,
+    companyInfo,
+    onDataLoaded: handleDataLoadedFromFile,
+  });
 
   // Active View Tab
   const [activeTab, setActiveTab] = useState<
@@ -270,6 +311,18 @@ export default function App() {
         </div>
       )}
 
+      {/* Local File Notification Banner (アクセス許可要求・保存エラー・未選択案内) */}
+      <LocalFileNotificationBanner
+        fileName={localFileName}
+        status={localFileStatus}
+        errorMessage={localFileErrorMessage}
+        onOpenFile={handleOpenLocalFile}
+        onCreateNewFile={handleCreateNewLocalFile}
+        onRequestPermission={handleRequestLocalFilePermission}
+        onOpenModal={() => setIsLocalFileManagerOpen(true)}
+        onSaveNow={handleSaveLocalFileNow}
+      />
+
       {/* Global Header */}
       <Header
         currentFY={currentFY}
@@ -300,6 +353,16 @@ export default function App() {
         isOnline={isOnline}
         isInIframe={isInIframe}
         onOpenPwaModal={() => setIsPwaModalOpen(true)}
+        // Local File Storage Props
+        localFileName={localFileName}
+        localFileStatus={localFileStatus}
+        localFileLastSavedAt={localFileLastSavedAt}
+        isLocalFileSupported={isLocalFileSupported}
+        onOpenLocalFile={handleOpenLocalFile}
+        onCreateNewLocalFile={handleCreateNewLocalFile}
+        onRequestLocalFilePermission={handleRequestLocalFilePermission}
+        onOpenLocalFileManagerModal={() => setIsLocalFileManagerOpen(true)}
+        onSaveLocalFileNow={handleSaveLocalFileNow}
       />
 
       {/* Main Container */}
@@ -569,6 +632,25 @@ export default function App() {
         isInIframe={isInIframe}
         onOpenInNewTab={openInNewTab}
         onInstall={triggerInstall}
+      />
+
+      {/* PC Local File Manager Modal (File System Access & Backups) */}
+      <LocalFileManagerModal
+        isOpen={isLocalFileManagerOpen}
+        onClose={() => setIsLocalFileManagerOpen(false)}
+        fileName={localFileName}
+        status={localFileStatus}
+        lastSavedAt={localFileLastSavedAt}
+        errorMessage={localFileErrorMessage}
+        isSupported={isLocalFileSupported}
+        onOpenFile={handleOpenLocalFile}
+        onCreateNewFile={handleCreateNewLocalFile}
+        onSaveAsNewFile={handleSaveAsNewLocalFile}
+        onRequestPermission={handleRequestLocalFilePermission}
+        onDisconnectFile={handleDisconnectLocalFile}
+        onSaveNow={handleSaveLocalFileNow}
+        onExportDownload={() => handleExportManualDownload()}
+        onImportFile={handleImportManualFile}
       />
     </div>
   );
