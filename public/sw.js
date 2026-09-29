@@ -1,21 +1,26 @@
 // Service Worker for 不動産販売・原価管理システム (PWA Offline-First)
-const CACHE_NAME = 'real-estate-cost-manager-v2';
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icon.svg',
-  '/pwa-192x192.png',
-  '/pwa-512x512.png',
-  '/apple-touch-icon.png',
-];
+const CACHE_NAME = 'real-estate-cost-manager-v3';
+
+// Service Workerの登録スコープに基づいて相対アセットURLを動的生成（GitHub Pagesサブパス完全対応）
+function getStaticAssets() {
+  const scope = self.registration ? self.registration.scope : self.location.href;
+  return [
+    scope,
+    new URL('index.html', scope).href,
+    new URL('manifest.json', scope).href,
+    new URL('icon.svg', scope).href,
+    new URL('pwa-192x192.png', scope).href,
+    new URL('pwa-512x512.png', scope).href,
+    new URL('apple-touch-icon.png', scope).href,
+  ];
+}
 
 // Install Event - Pre-cache critical core shell
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      // Add core shell assets
-      for (const asset of STATIC_ASSETS) {
+      const assets = getStaticAssets();
+      for (const asset of assets) {
         try {
           const response = await fetch(asset, { cache: 'no-cache' });
           if (response && response.status === 200) {
@@ -68,33 +73,37 @@ async function isValidAppResponse(response, isHtml = false) {
   return true;
 }
 
-// Fetch Event - Cache-First for instant offline/sleeping container startup
+// Fetch Event - Cache-First for instant offline startup
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
   if (!url.protocol.startsWith('http')) return;
 
+  const scope = self.registration ? self.registration.scope : self.location.href;
+  const indexHtmlUrl = new URL('index.html', scope).href;
+
   // 1. Navigation requests (HTML document / page loads)
   if (event.request.mode === 'navigate') {
     event.respondWith(
       (async () => {
         const cache = await caches.open(CACHE_NAME);
-        const cachedHtml = (await cache.match(event.request)) || (await cache.match('/index.html')) || (await cache.match('/'));
+        const cachedHtml =
+          (await cache.match(event.request)) ||
+          (await cache.match(indexHtmlUrl)) ||
+          (await cache.match(scope));
 
-        // If we have a cached version, serve it IMMEDIATELY so app opens with 0ms delay even if container is asleep
+        // If we have a cached version, serve it IMMEDIATELY so app opens with 0ms delay even if offline
         if (cachedHtml) {
-          // In the background, attempt to refresh cache if server is awake
+          // In the background, attempt to refresh cache if server is reachable
           fetch(event.request)
             .then(async (networkResponse) => {
               if (await isValidAppResponse(networkResponse, true)) {
                 cache.put(event.request, networkResponse.clone());
-                cache.put('/index.html', networkResponse.clone());
+                cache.put(indexHtmlUrl, networkResponse.clone());
               }
             })
-            .catch(() => {
-              // Ignore background fetch error
-            });
+            .catch(() => {});
           return cachedHtml;
         }
 
@@ -103,7 +112,7 @@ self.addEventListener('fetch', (event) => {
           const networkResponse = await fetch(event.request);
           if (await isValidAppResponse(networkResponse, true)) {
             cache.put(event.request, networkResponse.clone());
-            cache.put('/index.html', networkResponse.clone());
+            cache.put(indexHtmlUrl, networkResponse.clone());
             return networkResponse;
           }
         } catch (err) {
@@ -111,9 +120,12 @@ self.addEventListener('fetch', (event) => {
         }
 
         // Fallback to whatever cache we have
-        return cachedHtml || new Response('オフラインです。一度オンラインで起動してください。', {
-          headers: { 'Content-Type': 'text/html; charset=utf-8' },
-        });
+        return (
+          cachedHtml ||
+          new Response('オフラインです。一度オンラインで起動してください。', {
+            headers: { 'Content-Type': 'text/html; charset=utf-8' },
+          })
+        );
       })()
     );
     return;
@@ -159,4 +171,3 @@ self.addEventListener('fetch', (event) => {
     })()
   );
 });
-

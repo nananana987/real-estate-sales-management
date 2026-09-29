@@ -14,8 +14,10 @@ export interface BeforeInstallPromptEvent extends Event {
 export function registerServiceWorker() {
   if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     window.addEventListener('load', () => {
+      // GitHub Pages等のサブディレクトリ公開時でも正しく解決できるよう動的URLを生成
+      const swUrl = new URL('sw.js', window.location.href).href;
       navigator.serviceWorker
-        .register('/sw.js')
+        .register(swUrl)
         .then((reg) => {
           console.log('[PWA] Service Worker registered with scope:', reg.scope);
           // Check for worker updates
