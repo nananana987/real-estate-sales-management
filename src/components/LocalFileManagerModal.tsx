@@ -129,7 +129,7 @@ export const LocalFileManagerModal: React.FC<LocalFileManagerModalProps> = ({
             </div>
             <div>
               <h2 className="text-sm font-bold text-slate-900">PCローカルファイル直接保存設定</h2>
-              <p className="text-[11px] text-slate-500">File System Access API & オフライン管理</p>
+              <p className="text-[11px] text-slate-500">File System Access API & ローカルファイル管理</p>
             </div>
           </div>
           <button
