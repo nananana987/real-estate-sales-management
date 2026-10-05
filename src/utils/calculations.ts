@@ -502,3 +502,81 @@ export function calculateAccountingSummary(properties: Property[], fy: FiscalYea
     profitMargin,
   };
 }
+
+/**
+ * 現在設定されている事業年度（または会社決算月）から新年度の開始日・終了日・期数を自動算出
+ * @param currentFY 現在の事業年度（決算繰越元）
+ * @param fiscalMonth 会社情報で設定されている決算月（1〜12）
+ */
+export function calculateNextFiscalYearDates(
+  currentFY?: FiscalYear | null,
+  fiscalMonth?: number
+): { startDate: string; endDate: string; periodNumber: number } {
+  // 1. 現在の事業年度(currentFY)の情報が存在する場合
+  if (currentFY && currentFY.endDate) {
+    const endParts = currentFY.endDate.split('-').map(Number);
+    if (endParts.length === 3 && !endParts.some(isNaN)) {
+      const [endY, endM, endD] = endParts;
+
+      // 新年度開始日は現事業年度終了日（期末日）の「翌日」
+      const nextStartObj = new Date(Date.UTC(endY, endM - 1, endD + 1));
+      const nextStartStr = nextStartObj.toISOString().slice(0, 10);
+
+      // 新年度終了日は現事業年度終了日の「ちょうど1年後」
+      const targetYear = endY + 1;
+      const targetMonth = endM;
+      // 月末日の調整（閏年2/29 -> 2/28、または31日/30日）
+      const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth, 0)).getUTCDate();
+      const targetDay = Math.min(endD, daysInTargetMonth);
+
+      const nextEndStr = `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
+      const periodNumber = (currentFY.periodNumber || 1) + 1;
+
+      return {
+        startDate: nextStartStr,
+        endDate: nextEndStr,
+        periodNumber,
+      };
+    }
+  }
+
+  // 2. フォールバック: 会社情報の決算月（未設定時は3月）をもとに算出
+  const month = fiscalMonth && fiscalMonth >= 1 && fiscalMonth <= 12 ? fiscalMonth : 3;
+  const now = new Date();
+  const currentYear = now.getFullYear();
+
+  const daysInMonth = new Date(Date.UTC(currentYear, month, 0)).getUTCDate();
+  const startMonth = month === 12 ? 1 : month + 1;
+  const startYear = month === 12 ? currentYear : currentYear - 1;
+
+  const startDate = `${startYear}-${String(startMonth).padStart(2, '0')}-01`;
+  const endDate = `${currentYear}-${String(month).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
+
+  return {
+    startDate,
+    endDate,
+    periodNumber: 1,
+  };
+}
+
+/**
+ * 開始日(YYYY-MM-DD)が変更された際、1年間の通常事業年度終了日を自動算出
+ */
+export function estimateFiscalYearEndDate(startDate: string): string {
+  const parts = startDate.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(isNaN)) return '';
+  const [startY, startM, startD] = parts;
+
+  if (startD === 1) {
+    // 月初開始の場合 (例: 2026-10-01 -> 2027-09-30)
+    const prevMonth = startM === 1 ? 12 : startM - 1;
+    const endYear = startM === 1 ? startY : startY + 1;
+    const lastDay = new Date(Date.UTC(endYear, prevMonth, 0)).getUTCDate();
+    return `${endYear}-${String(prevMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  }
+
+  // 月中日開始の場合 (例: 2026-10-15 -> 2027-10-14)
+  const targetYear = startY + 1;
+  const prevDateObj = new Date(Date.UTC(targetYear, startM - 1, startD - 1));
+  return prevDateObj.toISOString().slice(0, 10);
+}

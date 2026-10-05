@@ -219,7 +219,12 @@ export function rolloverToNewFiscalYear(
   allProperties: Property[],
   allFiscalYears: FiscalYear[]
 ): { updatedFiscalYears: FiscalYear[]; updatedProperties: Property[]; newFYId: string } {
-  const newFYId = `fy-${newStartDate.slice(0, 4)}`;
+  const baseId = `fy-${newPeriodNumber}`;
+  let newFYId = baseId;
+  let counter = 1;
+  while (allFiscalYears.some(f => f.id === newFYId)) {
+    newFYId = `${baseId}-${counter++}`;
+  }
   const newFYName = `第${newPeriodNumber}期 (${newStartDate.replace(/-/g, '/')} 〜 ${newEndDate.replace(/-/g, '/')})`;
 
   const updatedFiscalYears: FiscalYear[] = allFiscalYears.map(fy => ({

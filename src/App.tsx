@@ -111,6 +111,7 @@ export default function App() {
   const [detailProperty, setDetailProperty] = useState<Property | null>(null);
 
   const [isFYModalOpen, setIsFYModalOpen] = useState(false);
+  const [fyModalInitialTab, setFyModalInitialTab] = useState<'list' | 'create' | 'rollover'>('list');
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const [isCsvImportOpen, setIsCsvImportOpen] = useState(false);
 
@@ -304,13 +305,17 @@ export default function App() {
         activeTab={activeTab}
         onSelectTab={tab => {
           if (tab === 'rollover') {
+            setFyModalInitialTab('rollover');
             setIsFYModalOpen(true);
           } else {
             setActiveTab(tab);
           }
         }}
         onOpenNewPropertyModal={handleOpenNewProperty}
-        onOpenFYModal={() => setIsFYModalOpen(true)}
+        onOpenFYModal={() => {
+          setFyModalInitialTab('list');
+          setIsFYModalOpen(true);
+        }}
         onOpenCsvImport={() => setIsCsvImportOpen(true)}
         properties={properties}
         onDataUpdated={(newProps, newFYs, newCompany) => {
@@ -567,6 +572,8 @@ export default function App() {
         fiscalYears={fiscalYears}
         currentFY={currentFY}
         properties={properties}
+        companyInfo={companyInfo}
+        initialSubTab={fyModalInitialTab}
         onFiscalYearsUpdated={handleFiscalYearsUpdated}
         onSelectFiscalYear={handleSelectFiscalYear}
       />

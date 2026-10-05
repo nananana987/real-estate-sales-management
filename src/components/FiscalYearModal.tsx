@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Calendar,
@@ -9,10 +9,16 @@ import {
   ArrowRight,
   Boxes,
   Trash2,
+  RotateCcw,
 } from 'lucide-react';
-import { FiscalYear, Property } from '../types';
+import { FiscalYear, Property, CompanyInfo } from '../types';
 import { rolloverToNewFiscalYear } from '../utils/storage';
-import { calculatePropertyFinancials, formatCurrency } from '../utils/calculations';
+import {
+  calculatePropertyFinancials,
+  formatCurrency,
+  calculateNextFiscalYearDates,
+  estimateFiscalYearEndDate,
+} from '../utils/calculations';
 
 interface FiscalYearModalProps {
   isOpen: boolean;
@@ -20,6 +26,8 @@ interface FiscalYearModalProps {
   fiscalYears: FiscalYear[];
   currentFY: FiscalYear;
   properties: Property[];
+  companyInfo?: CompanyInfo;
+  initialSubTab?: 'list' | 'create' | 'rollover';
   onFiscalYearsUpdated: (fiscalYears: FiscalYear[], properties: Property[], newFYId?: string) => void;
   onSelectFiscalYear: (fyId: string) => void;
 }
@@ -30,27 +38,44 @@ export const FiscalYearModal: React.FC<FiscalYearModalProps> = ({
   fiscalYears,
   currentFY,
   properties,
+  companyInfo,
+  initialSubTab,
   onFiscalYearsUpdated,
   onSelectFiscalYear,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'list' | 'create' | 'rollover'>('list');
 
   // New FY form state
-  const nextPeriodNumber = Math.max(...fiscalYears.map(f => f.periodNumber || 0), 0) + 1;
-  const lastFY = fiscalYears[fiscalYears.length - 1];
+  const [newPeriodNum, setNewPeriodNum] = useState<number>(1);
+  const [newStartDate, setNewStartDate] = useState<string>('');
+  const [newEndDate, setNewEndDate] = useState<string>('');
 
-  // Default next dates
-  let defaultNextStart = '2026-04-01';
-  let defaultNextEnd = '2027-03-31';
-  if (lastFY) {
-    const endYear = parseInt(lastFY.endDate.slice(0, 4), 10);
-    defaultNextStart = `${endYear}-04-01`;
-    defaultNextEnd = `${endYear + 1}-03-31`;
-  }
+  // 設定されている事業年度（または決算月）から新年度の開始日・終了日・期数を自動算出
+  const resetToAutoCalculatedDates = () => {
+    const calc = calculateNextFiscalYearDates(currentFY, companyInfo?.fiscalMonth);
+    setNewPeriodNum(calc.periodNumber);
+    setNewStartDate(calc.startDate);
+    setNewEndDate(calc.endDate);
+  };
 
-  const [newPeriodNum, setNewPeriodNum] = useState<number>(nextPeriodNumber);
-  const [newStartDate, setNewStartDate] = useState(defaultNextStart);
-  const [newEndDate, setNewEndDate] = useState(defaultNextEnd);
+  // モーダルオープン時または事業年度・初期タブ変更時に自動算出を同期
+  useEffect(() => {
+    if (isOpen) {
+      if (initialSubTab) {
+        setActiveSubTab(initialSubTab);
+      }
+      resetToAutoCalculatedDates();
+    }
+  }, [isOpen, currentFY, companyInfo?.fiscalMonth, initialSubTab]);
+
+  // 開始日を手動で変更した場合、終了日を自動で1年後に推定調整
+  const handleStartDateChange = (val: string) => {
+    setNewStartDate(val);
+    const estimated = estimateFiscalYearEndDate(val);
+    if (estimated) {
+      setNewEndDate(estimated);
+    }
+  };
 
   // Rollover Preview State
   const inventoryToCarryOver = properties.filter(p => {
@@ -370,14 +395,28 @@ export const FiscalYearModal: React.FC<FiscalYearModalProps> = ({
 
               {/* New FY Settings */}
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
-                <div className="font-bold text-slate-800 text-xs">新年度の期間設定:</div>
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-slate-800 text-xs flex items-center space-x-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-purple-600" />
+                    <span>新年度の期間設定（現事業年度から自動設定）:</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={resetToAutoCalculatedDates}
+                    className="inline-flex items-center space-x-1 text-[11px] text-purple-600 hover:text-purple-800 font-bold hover:underline cursor-pointer"
+                    title={`第${currentFY.periodNumber}期（${currentFY.startDate}〜${currentFY.endDate}）の翌日から算出した日付に再設定`}
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>現事業年度から再計算</span>
+                  </button>
+                </div>
                 <div className="grid grid-cols-3 gap-2">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-600 mb-0.5">期数</label>
                     <input
                       type="number"
                       value={newPeriodNum}
-                      onChange={e => setNewPeriodNum(parseInt(e.target.value, 10))}
+                      onChange={e => setNewPeriodNum(parseInt(e.target.value, 10) || 1)}
                       className="w-full px-2 py-1 text-xs bg-white border border-slate-300 rounded focus:ring-slate-900"
                     />
                   </div>
@@ -386,7 +425,7 @@ export const FiscalYearModal: React.FC<FiscalYearModalProps> = ({
                     <input
                       type="date"
                       value={newStartDate}
-                      onChange={e => setNewStartDate(e.target.value)}
+                      onChange={e => handleStartDateChange(e.target.value)}
                       className="w-full px-2 py-1 text-xs bg-white border border-slate-300 rounded focus:ring-slate-900"
                     />
                   </div>
@@ -400,6 +439,9 @@ export const FiscalYearModal: React.FC<FiscalYearModalProps> = ({
                     />
                   </div>
                 </div>
+                <p className="text-[10px] text-slate-500">
+                  ※現在選択されている第{currentFY.periodNumber}期（期末: {currentFY.endDate}）の翌日から始まる1年間の期間が自動セットされています。必要に応じて変更も可能です。
+                </p>
               </div>
 
               <div className="pt-1 flex justify-end">
@@ -424,7 +466,7 @@ export const FiscalYearModal: React.FC<FiscalYearModalProps> = ({
                   <input
                     type="number"
                     value={newPeriodNum}
-                    onChange={e => setNewPeriodNum(parseInt(e.target.value, 10))}
+                    onChange={e => setNewPeriodNum(parseInt(e.target.value, 10) || 1)}
                     className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded focus:ring-slate-900"
                     required
                   />
@@ -434,7 +476,7 @@ export const FiscalYearModal: React.FC<FiscalYearModalProps> = ({
                   <input
                     type="date"
                     value={newStartDate}
-                    onChange={e => setNewStartDate(e.target.value)}
+                    onChange={e => handleStartDateChange(e.target.value)}
                     className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded focus:ring-slate-900"
                     required
                   />
