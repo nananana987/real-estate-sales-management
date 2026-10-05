@@ -382,14 +382,17 @@ export const FiscalYearModal: React.FC<FiscalYearModalProps> = ({
                           key={p.id}
                           className="flex items-center justify-between p-1.5 rounded bg-slate-50 border border-slate-100 text-slate-600 text-xs"
                         >
-                          <span className="truncate max-w-[160px]">{p.name}</span>
-                          <span className="text-[10px] bg-slate-200 text-slate-700 px-1 py-0.2 rounded">
-                            完売
+                          <span className="truncate max-w-[160px] font-medium">{p.name}</span>
+                          <span className="text-[10px] bg-slate-200 text-slate-700 px-1 py-0.2 rounded font-bold">
+                            完売台帳へ
                           </span>
                         </div>
                       ))
                     )}
                   </div>
+                  <p className="text-[10px] text-slate-500 pt-1">
+                    ※完売物件は新年度の進行中一覧には表示されず、「売却済み物件一覧」ページで引き続き確認できます。
+                  </p>
                 </div>
               </div>
 

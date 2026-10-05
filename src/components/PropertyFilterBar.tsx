@@ -35,6 +35,8 @@ interface PropertyFilterBarProps {
   onViewModeChange: (mode: 'table' | 'cards') => void;
   totalCount: number;
   filteredCount: number;
+  soldCount?: number;
+  onNavigateToSoldProperties?: () => void;
   onPrint?: () => void;
 }
 
@@ -51,6 +53,8 @@ export const PropertyFilterBar: React.FC<PropertyFilterBarProps> = ({
   onViewModeChange,
   totalCount,
   filteredCount,
+  soldCount,
+  onNavigateToSoldProperties,
   onPrint,
 }) => {
   return (
@@ -204,17 +208,17 @@ export const PropertyFilterBar: React.FC<PropertyFilterBarProps> = ({
             一部売却済
           </button>
 
-          <button
-            type="button"
-            onClick={() => onStatusFilterChange('sold_out')}
-            className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
-              statusFilter === 'sold_out'
-                ? 'bg-slate-700 text-white font-bold'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            完売
-          </button>
+          {onNavigateToSoldProperties && soldCount !== undefined && soldCount > 0 && (
+            <button
+              type="button"
+              onClick={onNavigateToSoldProperties}
+              className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded text-[11px] font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors border border-slate-300 ml-1 cursor-pointer"
+              title="完売・売却完了物件一覧ページへ移動"
+            >
+              <CheckCircle className="w-3 h-3 text-emerald-600" />
+              <span>売却済台帳 ({soldCount}件) →</span>
+            </button>
+          )}
         </div>
 
         {/* Period Filter (当期関連) */}

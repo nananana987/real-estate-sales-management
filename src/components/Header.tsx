@@ -25,8 +25,9 @@ interface HeaderProps {
   onSelectFiscalYear: (fyId: string) => void;
   companyInfo: CompanyInfo;
   onOpenCompanyModal: () => void;
-  activeTab: 'properties' | 'accounting' | 'inventory' | 'transactions' | 'rollover';
-  onSelectTab: (tab: 'properties' | 'accounting' | 'inventory' | 'transactions' | 'rollover') => void;
+  activeTab: 'properties' | 'sold_properties' | 'accounting' | 'inventory' | 'transactions' | 'rollover';
+  onSelectTab: (tab: 'properties' | 'sold_properties' | 'accounting' | 'inventory' | 'transactions' | 'rollover') => void;
+  soldCount?: number;
   onOpenNewPropertyModal: () => void;
   onOpenFYModal: () => void;
   onOpenCsvImport: () => void;
@@ -53,6 +54,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenCompanyModal,
   activeTab,
   onSelectTab,
+  soldCount,
   onOpenNewPropertyModal,
   onOpenFYModal,
   onOpenCsvImport,
@@ -235,7 +237,25 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <Building2 className="w-3.5 h-3.5" />
-            <span>物件一覧 & 総合収支</span>
+            <span>進行中・保有物件一覧</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onSelectTab('sold_properties')}
+            className={`inline-flex items-center space-x-1.5 py-2 px-3 text-xs font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer rounded-t-md ${
+              activeTab === 'sold_properties'
+                ? 'border-emerald-600 text-emerald-700 bg-emerald-50/60 font-bold'
+                : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+            }`}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            <span>売却済み物件一覧</span>
+            {soldCount !== undefined && soldCount > 0 && (
+              <span className="px-1.5 py-0.2 text-[10px] bg-slate-100 text-slate-700 border border-slate-300 rounded-full font-bold">
+                {soldCount}
+              </span>
+            )}
           </button>
 
           <button

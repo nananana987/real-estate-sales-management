@@ -43,6 +43,7 @@ import { FiscalYearModal } from './components/FiscalYearModal';
 import { CompanyModal } from './components/CompanyModal';
 import { CsvImportModal } from './components/CsvImportModal';
 import { LocalFileManagerModal } from './components/LocalFileManagerModal';
+import { SoldPropertiesView } from './components/SoldPropertiesView';
 import { LocalFileNotificationBanner } from './components/LocalFileNotificationBanner';
 import { useLocalFileStore } from './utils/useLocalFileStore';
 import { AppDataFile } from './types';
@@ -93,7 +94,7 @@ export default function App() {
 
   // Active View Tab
   const [activeTab, setActiveTab] = useState<
-    'properties' | 'accounting' | 'inventory' | 'transactions' | 'rollover'
+    'properties' | 'sold_properties' | 'accounting' | 'inventory' | 'transactions' | 'rollover'
   >('properties');
 
   // Filter & Search & Sort State
@@ -223,9 +224,24 @@ export default function App() {
     saveProperties(updated);
   };
 
-  // Filtered and Sorted Properties
+  // 進行中・保有中物件と完売・売却済物件の仕分け
+  const { activeProperties, soldProperties } = useMemo(() => {
+    const active: Property[] = [];
+    const sold: Property[] = [];
+    properties.forEach(p => {
+      const fin = calculatePropertyFinancials(p, currentFY);
+      if (fin.status === 'sold_out') {
+        sold.push(p);
+      } else {
+        active.push(p);
+      }
+    });
+    return { activeProperties: active, soldProperties: sold };
+  }, [properties, currentFY]);
+
+  // Filtered and Sorted Properties（進行中・保有中物件のみ。売却済みは除外）
   const filteredProperties = useMemo(() => {
-    return properties
+    return activeProperties
       .filter(property => {
         const fin = calculatePropertyFinancials(property, currentFY);
 
@@ -279,7 +295,7 @@ export default function App() {
             return (b.createdAt || '').localeCompare(a.createdAt || '');
         }
       });
-  }, [properties, searchQuery, statusFilter, periodFilter, sortOption, currentFY]);
+  }, [activeProperties, searchQuery, statusFilter, periodFilter, sortOption, currentFY]);
 
   return (
     <div className="min-h-screen bg-slate-50/70 text-slate-900 flex flex-col font-sans text-xs">
@@ -311,6 +327,7 @@ export default function App() {
             setActiveTab(tab);
           }
         }}
+        soldCount={soldProperties.length}
         onOpenNewPropertyModal={handleOpenNewProperty}
         onOpenFYModal={() => {
           setFyModalInitialTab('list');
@@ -439,8 +456,10 @@ export default function App() {
               onSortOptionChange={setSortOption}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
-              totalCount={properties.length}
+              totalCount={activeProperties.length}
               filteredCount={filteredProperties.length}
+              soldCount={soldProperties.length}
+              onNavigateToSoldProperties={() => setActiveTab('sold_properties')}
               onPrint={() => window.print()}
             />
 
@@ -487,6 +506,19 @@ export default function App() {
               />
             )}
           </div>
+        )}
+
+        {/* TAB: SOLD PROPERTIES (売却済み物件一覧・完売台帳) */}
+        {activeTab === 'sold_properties' && (
+          <SoldPropertiesView
+            properties={properties}
+            fiscalYears={fiscalYears}
+            currentFY={currentFY}
+            companyInfo={companyInfo}
+            onSelectProperty={handleOpenDetail}
+            onEditProperty={handleEditProperty}
+            onDeleteProperty={handleDeleteProperty}
+          />
         )}
 
         {/* TAB 2: ACCOUNTING (会計科目突合・決算照合) */}
