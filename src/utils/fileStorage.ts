@@ -108,6 +108,24 @@ export async function clearHandleFromIDB(): Promise<void> {
 }
 
 /**
+ * ファイルハンドルの現在のパーミッション状態を非侵襲的に確認（ダイアログは出さない）
+ */
+export async function queryHandlePermission(
+  handle: FileSystemFileHandle,
+  mode: 'read' | 'readwrite' = 'readwrite'
+): Promise<PermissionState | 'unsupported'> {
+  if (!handle || typeof handle.queryPermission !== 'function') {
+    return 'unsupported';
+  }
+  try {
+    return await handle.queryPermission({ mode });
+  } catch (err) {
+    console.warn('[FileStorage] queryPermissionエラー:', err);
+    return 'denied';
+  }
+}
+
+/**
  * ファイルハンドルへのアクセス権限を確認（必要に応じてプロンプト表示）
  * @param handle ファイルハンドル
  * @param withPrompt ユーザー操作(クリック等)の文脈で権限リクエストダイアログを出すか
@@ -122,13 +140,13 @@ export async function verifyHandlePermission(
 
   try {
     // まず現在のパーミッション状態を非侵襲的に確認
-    const status = await handle.queryPermission(options);
+    const status = await queryHandlePermission(handle, 'readwrite');
     if (status === 'granted') {
       return true;
     }
 
     // ユーザーインタラクション起因の場合のみブラウザ標準ダイアログを起動
-    if (withPrompt) {
+    if (withPrompt && typeof handle.requestPermission === 'function') {
       const requestStatus = await handle.requestPermission(options);
       if (requestStatus === 'granted') {
         return true;
