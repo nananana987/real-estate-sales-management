@@ -39,34 +39,48 @@ export const LocalFileNotificationBanner: React.FC<LocalFileNotificationBannerPr
     return null;
   }
 
-  // 1. パーミッション許可が必要な場合（最重要・非表示不可）
+  // 1. パーミッション許可が必要な場合（閉じることも可能）
   if (status === 'permission_needed') {
+    if (isDismissed) {
+      return null;
+    }
     return (
-      <div className="bg-amber-500 text-white px-3 sm:px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-2 shadow-xs no-print">
+      <div className="bg-amber-50 border-b border-amber-300 text-amber-950 px-3 sm:px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-2 shadow-xs no-print">
         <div className="flex items-center space-x-2">
-          <AlertTriangle className="w-4 h-4 shrink-0 text-amber-100" />
+          <ShieldCheck className="w-4 h-4 shrink-0 text-amber-700" />
           <span>
-            <strong>保存先ファイルへのアクセス許可が必要です:</strong> 前回開いていた「
-            <span className="font-mono underline">{fileName || 'データファイル'}</span>
-            」への自動保存を再開するには、ブラウザのアクセス許可を行ってください。
+            <strong>保存先ファイルへのアクセス許可:</strong> 前回開いていた「
+            <span className="font-mono underline font-bold">{fileName || 'データファイル'}</span>
+            」への自動保存を再開するには、アクセス許可を行ってください。
+            <span className="text-amber-800 ml-1 hidden lg:inline">
+              （ブラウザの安全仕様により、再起動後に1回確認されます）
+            </span>
           </span>
         </div>
         <div className="flex items-center space-x-2 shrink-0">
           <button
             type="button"
             onClick={onRequestPermission}
-            className="inline-flex items-center space-x-1.5 px-3 py-1 bg-white text-amber-900 hover:bg-amber-50 rounded-md font-bold text-xs transition-colors shadow-2xs cursor-pointer"
+            className="inline-flex items-center space-x-1.5 px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-md font-bold text-xs transition-colors shadow-2xs cursor-pointer"
           >
-            <ShieldCheck className="w-3.5 h-3.5 text-amber-700" />
+            <ShieldCheck className="w-3.5 h-3.5" />
             <span>アクセスを許可して再接続</span>
           </button>
           <button
             type="button"
             onClick={onOpenFile}
-            className="inline-flex items-center space-x-1 px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-md font-bold text-xs transition-colors cursor-pointer border border-amber-400"
+            className="inline-flex items-center space-x-1 px-2.5 py-1 bg-white hover:bg-amber-100/70 text-amber-900 rounded-md font-bold text-xs transition-colors cursor-pointer border border-amber-300"
           >
-            <FolderOpen className="w-3 h-3" />
+            <FolderOpen className="w-3 h-3 text-blue-600" />
             <span>別のファイルを開く</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsDismissed(true)}
+            className="p-1 hover:bg-amber-200/70 rounded text-amber-700 hover:text-amber-950 transition-colors cursor-pointer ml-1"
+            title="通知を閉じる（ヘッダーの「再接続を許可」からいつでも接続できます）"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
       </div>

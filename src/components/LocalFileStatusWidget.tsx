@@ -93,9 +93,9 @@ export const LocalFileStatusWidget: React.FC<LocalFileStatusWidgetProps> = ({
   // 3. パーミッション許可が必要な場合（再読み込み後など）
   if (status === 'permission_needed') {
     return (
-      <div className="inline-flex items-center space-x-1.5 bg-amber-100/90 border border-amber-400 rounded-lg px-2 py-0.5 text-xs shadow-2xs animate-pulse">
-        <AlertTriangle className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-        <span className="text-amber-950 font-bold truncate max-w-[120px] sm:max-w-[160px]" title={fileName}>
+      <div className="inline-flex items-center space-x-1.5 bg-amber-50 border border-amber-300 rounded-lg px-2 py-0.5 text-xs shadow-2xs">
+        <ShieldCheck className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+        <span className="text-amber-900 font-bold truncate max-w-[120px] sm:max-w-[160px]" title={fileName}>
           {fileName}
         </span>
         <button
@@ -104,7 +104,6 @@ export const LocalFileStatusWidget: React.FC<LocalFileStatusWidgetProps> = ({
           className="inline-flex items-center space-x-1 px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded shadow-2xs cursor-pointer transition-colors"
           title="クリックしてファイルへのアクセス許可を再確認してください"
         >
-          <ShieldCheck className="w-3 h-3" />
           <span>再接続を許可</span>
         </button>
       </div>
