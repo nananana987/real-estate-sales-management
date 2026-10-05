@@ -13,9 +13,6 @@ import {
   RotateCcw,
   Printer,
   ChevronDown,
-  Wifi,
-  WifiOff,
-  Laptop,
   Settings,
 } from 'lucide-react';
 import { FiscalYear, CompanyInfo, Property, FileSaveStatus } from '../types';
@@ -36,11 +33,6 @@ interface HeaderProps {
   properties: Property[];
   onDataUpdated: (properties: Property[], fiscalYears: FiscalYear[], companyInfo?: CompanyInfo) => void;
   onResetData: () => void;
-  isInstallable: boolean;
-  isStandalone: boolean;
-  isOnline: boolean;
-  isInIframe?: boolean;
-  onOpenPwaModal: () => void;
   // Local File System Props
   localFileName: string | null;
   localFileStatus: FileSaveStatus;
@@ -67,11 +59,6 @@ export const Header: React.FC<HeaderProps> = ({
   properties,
   onDataUpdated,
   onResetData,
-  isInstallable,
-  isStandalone,
-  isOnline,
-  isInIframe = false,
-  onOpenPwaModal,
   localFileName,
   localFileStatus,
   localFileLastSavedAt,
@@ -130,44 +117,6 @@ export const Header: React.FC<HeaderProps> = ({
                   <Building2 className="w-3 h-3" />
                   <span>{companyInfo.name ? companyInfo.name : '会社情報設定'}</span>
                 </button>
-                
-                {/* PWA / Offline Status Indicator */}
-                <button
-                  type="button"
-                  onClick={onOpenPwaModal}
-                  className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
-                    !isOnline
-                      ? 'bg-amber-50 text-amber-800 border border-amber-300'
-                      : isStandalone
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-300'
-                      : isInIframe
-                      ? 'bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 animate-pulse'
-                      : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200/80'
-                  }`}
-                  title="PWA・オフライン設定を見る"
-                >
-                  {!isOnline ? (
-                    <>
-                      <WifiOff className="w-2.5 h-2.5 text-amber-600" />
-                      <span>オフライン動作中</span>
-                    </>
-                  ) : isStandalone ? (
-                    <>
-                      <Laptop className="w-2.5 h-2.5 text-emerald-600" />
-                      <span>PWAアプリ</span>
-                    </>
-                  ) : isInIframe ? (
-                    <>
-                      <Download className="w-2.5 h-2.5 text-amber-700" />
-                      <span>アプリ化（PWA案内）</span>
-                    </>
-                  ) : (
-                    <>
-                      <Download className="w-2.5 h-2.5 text-slate-600" />
-                      <span>PWA・オフライン対応</span>
-                    </>
-                  )}
-                </button>
               </div>
               <p className="text-[10px] text-slate-500 font-medium hidden sm:block">
                 仕入・付随費用・分筆売上・期末棚卸 & 会計科目突合
@@ -215,18 +164,6 @@ export const Header: React.FC<HeaderProps> = ({
                 設定
               </button>
             </div>
-
-            {/* PWA Install Button if available and not standalone */}
-            {isInstallable && !isStandalone && (
-              <button
-                type="button"
-                onClick={onOpenPwaModal}
-                className="hidden sm:inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>アプリ化</span>
-              </button>
-            )}
 
             {/* CSV Import Button */}
             <button

@@ -9,10 +9,8 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   Calendar,
-  AlertCircle,
   HelpCircle,
   History,
-  ExternalLink,
 } from 'lucide-react';
 import { Property, FiscalYear, CompanyInfo, PropertyStatus } from './types';
 import {
@@ -44,18 +42,12 @@ import { TransactionsView } from './components/TransactionsView';
 import { FiscalYearModal } from './components/FiscalYearModal';
 import { CompanyModal } from './components/CompanyModal';
 import { CsvImportModal } from './components/CsvImportModal';
-import { PwaInstallModal } from './components/PwaInstallModal';
 import { LocalFileManagerModal } from './components/LocalFileManagerModal';
 import { LocalFileNotificationBanner } from './components/LocalFileNotificationBanner';
-import { usePwa } from './utils/pwa';
 import { useLocalFileStore } from './utils/useLocalFileStore';
 import { AppDataFile } from './types';
 
 export default function App() {
-  // PWA Support & Offline Status
-  const { isInstallable, isStandalone, isOnline, isInIframe, openInNewTab, triggerInstall } = usePwa();
-  const [isPwaModalOpen, setIsPwaModalOpen] = useState(false);
-
   // State
   const [properties, setProperties] = useState<Property[]>(() => loadProperties());
   const [fiscalYears, setFiscalYears] = useState<FiscalYear[]>(() => loadFiscalYears());
@@ -290,27 +282,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50/70 text-slate-900 flex flex-col font-sans text-xs">
-      {/* AI Studio Iframe Notice Banner (For shared links & PWA installability) */}
-      {isInIframe && !isStandalone && (
-        <div className="bg-amber-600 text-white px-3 py-1.5 text-xs flex flex-wrap items-center justify-between gap-2 shadow-xs no-print">
-          <div className="flex items-center space-x-2">
-            <AlertCircle className="w-4 h-4 shrink-0 text-amber-200" />
-            <span>
-              <strong>Google AI Studioの共有フレーム内で開かれています。</strong>
-              PCやスマホにアプリとしてインストール（PWA化）する場合は、別タブで直接開いてください。
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={openInNewTab}
-            className="inline-flex items-center space-x-1 px-2.5 py-1 bg-white text-amber-900 hover:bg-amber-50 rounded font-bold text-xs transition-colors shadow-2xs shrink-0 cursor-pointer"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span>別タブで直接開く（PWA用）</span>
-          </button>
-        </div>
-      )}
-
       {/* Local File Notification Banner (アクセス許可要求・保存エラー・未選択案内) */}
       <LocalFileNotificationBanner
         fileName={localFileName}
@@ -348,11 +319,6 @@ export default function App() {
           if (newCompany) setCompanyInfo(newCompany);
         }}
         onResetData={handleResetData}
-        isInstallable={isInstallable}
-        isStandalone={isStandalone}
-        isOnline={isOnline}
-        isInIframe={isInIframe}
-        onOpenPwaModal={() => setIsPwaModalOpen(true)}
         // Local File Storage Props
         localFileName={localFileName}
         localFileStatus={localFileStatus}
@@ -620,18 +586,6 @@ export default function App() {
         onImport={handleImportCsv}
         existingProperties={properties}
         currentFY={currentFY}
-      />
-
-      {/* PWA Install & Offline Guide Modal */}
-      <PwaInstallModal
-        isOpen={isPwaModalOpen}
-        onClose={() => setIsPwaModalOpen(false)}
-        isInstallable={isInstallable}
-        isStandalone={isStandalone}
-        isOnline={isOnline}
-        isInIframe={isInIframe}
-        onOpenInNewTab={openInNewTab}
-        onInstall={triggerInstall}
       />
 
       {/* PC Local File Manager Modal (File System Access & Backups) */}

@@ -15,7 +15,6 @@ import {
   Unlink,
   HelpCircle,
   Clock,
-  WifiOff,
 } from 'lucide-react';
 import { FileSaveStatus, AppDataFile } from '../types';
 
@@ -349,7 +348,7 @@ export const LocalFileManagerModal: React.FC<LocalFileManagerModalProps> = ({
             </div>
           </div>
 
-          {/* Safety & Offline Guide */}
+          {/* Safety & Local Storage Guide */}
           <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-3.5 text-blue-900 text-[11px] space-y-2">
             <div className="font-bold flex items-center space-x-1.5 text-blue-950">
               <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
@@ -363,7 +362,7 @@ export const LocalFileManagerModal: React.FC<LocalFileManagerModalProps> = ({
                 <strong>二重バックアップ:</strong> ファイル保存と並行してブラウザのローカルキャッシュにも常時ミラーリングされるため、万が一の切断時でもデータは失われません。
               </li>
               <li>
-                <strong>完全オフライン対応:</strong> Service Workerによりアプリ全体がキャッシュされているため、インターネット未接続時でもアプリを起動し、PCローカルファイルの読み書きを行えます。
+                <strong>PCローカル完結:</strong> 外部サーバーやクラウドへデータが送信されることは一切なく、指定したPC上のファイル内で安全に管理されます。
               </li>
             </ul>
           </div>

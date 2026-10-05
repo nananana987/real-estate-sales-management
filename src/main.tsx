@@ -2,10 +2,14 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
-import { registerServiceWorker } from './utils/pwa';
-
-// Register PWA Service Worker for complete offline capabilities
-registerServiceWorker();
+// Unregister any legacy Service Worker from previous PWA installations
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(registrations => {
+    for (const registration of registrations) {
+      registration.unregister();
+    }
+  });
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
