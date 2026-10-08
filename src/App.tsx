@@ -240,7 +240,10 @@ export default function App() {
       }
     });
 
-    return { currentPeriodProperties, priorSoldProperties };
+    return {
+      currentPeriodProperties: currentPeriod,
+      priorSoldProperties: priorSold,
+    };
   }, [properties, currentFY, fiscalYears]);
 
   // Filtered and Sorted Properties（当期の物件一覧: 進行中・保有中および当期売却済物件）
