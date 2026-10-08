@@ -237,7 +237,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <Building2 className="w-3.5 h-3.5" />
-            <span>進行中・保有物件一覧</span>
+            <span>物件一覧</span>
           </button>
 
           <button
@@ -250,7 +250,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>売却済み物件一覧</span>
+            <span>売却済み台帳</span>
             {soldCount !== undefined && soldCount > 0 && (
               <span className="px-1.5 py-0.2 text-[10px] bg-slate-100 text-slate-700 border border-slate-300 rounded-full font-bold">
                 {soldCount}

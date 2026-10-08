@@ -33,6 +33,7 @@ import {
   getPurchaseFixedAssetTax,
   getSaleFixedAssetTax,
   formatSellerDisplayName,
+  isPropertySoldInPriorPeriod,
 } from '../utils/calculations';
 import { downloadCSV } from '../utils/storage';
 
@@ -116,7 +117,7 @@ export const SoldPropertiesView: React.FC<SoldPropertiesViewProps> = ({
           buyerNamesDisplay,
         };
       })
-      .filter(item => item.fin.status === 'sold_out');
+      .filter(item => isPropertySoldInPriorPeriod(item.property, currentFY, fiscalYears));
   }, [properties, currentFY, fiscalYears]);
 
   // 2. 検索・年度・種別フィルタおよび並び替え
@@ -140,11 +141,7 @@ export const SoldPropertiesView: React.FC<SoldPropertiesViewProps> = ({
         }
 
         // 年度フィルタ
-        if (selectedFYFilter === 'current') {
-          if (!item.isSoldInCurrentPeriod) return false;
-        } else if (selectedFYFilter === 'past') {
-          if (item.isSoldInCurrentPeriod) return false;
-        } else if (selectedFYFilter !== 'all') {
+        if (selectedFYFilter !== 'all') {
           if (item.soldFY?.id !== selectedFYFilter) return false;
         }
 
@@ -182,8 +179,6 @@ export const SoldPropertiesView: React.FC<SoldPropertiesViewProps> = ({
   // 3. 全体統計サマリー計算
   const summary = useMemo(() => {
     const totalCount = allSoldProperties.length;
-    const currentFYCount = allSoldProperties.filter(p => p.isSoldInCurrentPeriod).length;
-    const pastFYCount = totalCount - currentFYCount;
 
     // 現在表示されているフィルタ対象の合計
     const filteredTotalSales = filteredProperties.reduce(
@@ -200,8 +195,6 @@ export const SoldPropertiesView: React.FC<SoldPropertiesViewProps> = ({
 
     return {
       totalCount,
-      currentFYCount,
-      pastFYCount,
       filteredTotalSales,
       filteredTotalCOGS,
       filteredTotalProfit,
@@ -329,19 +322,14 @@ export const SoldPropertiesView: React.FC<SoldPropertiesViewProps> = ({
             <div>
               <div className="flex items-center space-x-2">
                 <h2 className="text-sm font-bold text-slate-900 tracking-tight">
-                  売却済み物件一覧（完売台帳）
+                  売却済み台帳（前期以前・完売物件）
                 </h2>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-300">
-                  全{summary.totalCount}物件
+                  前期以前完売: {summary.totalCount}物件
                 </span>
-                {summary.currentFYCount > 0 && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    当期完売: {summary.currentFYCount}物件
-                  </span>
-                )}
               </div>
               <p className="text-[11px] text-slate-500 mt-0.5">
-                売却決済が完了し棚卸残高が0となった物件のアーカイブ台帳です。販売実績・粗利益・利益率を確認できます。
+                第{currentFY.periodNumber}期より前の事業年度に売却完了（完売）した物件の台帳です。（※当期中に売却された物件は「物件一覧」に表示されます）
               </p>
             </div>
           </div>
@@ -372,7 +360,7 @@ export const SoldPropertiesView: React.FC<SoldPropertiesViewProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3">
           <div className="bg-slate-50/70 p-2.5 rounded-lg border border-slate-200/80">
             <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
-              <span>売却完了物件数</span>
+              <span>前期売却完了物件数</span>
               <Building2 className="w-3.5 h-3.5 text-slate-400" />
             </div>
             <div className="text-base font-bold text-slate-900 font-mono mt-0.5">
@@ -380,7 +368,7 @@ export const SoldPropertiesView: React.FC<SoldPropertiesViewProps> = ({
               <span className="text-xs font-normal text-slate-500 ml-1">件</span>
             </div>
             <div className="text-[10px] text-slate-400 mt-0.5">
-              当期完売: {filteredProperties.filter(p => p.isSoldInCurrentPeriod).length}件 / 前期以前: {filteredProperties.filter(p => !p.isSoldInCurrentPeriod).length}件
+              前期以前に完売・決済完了
             </div>
           </div>
 
@@ -503,63 +491,32 @@ export const SoldPropertiesView: React.FC<SoldPropertiesViewProps> = ({
               onClick={() => setSelectedFYFilter('all')}
               className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
                 selectedFYFilter === 'all'
-                  ? 'bg-slate-900 text-white'
+                  ? 'bg-slate-900 text-white font-bold'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              全年度 ({allSoldProperties.length})
+              全期 ({allSoldProperties.length})
             </button>
 
-            <button
-              type="button"
-              onClick={() => setSelectedFYFilter('current')}
-              className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
-                selectedFYFilter === 'current'
-                  ? 'bg-emerald-600 text-white font-bold'
-                  : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
-              }`}
-            >
-              当期完売 ({summary.currentFYCount})
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSelectedFYFilter('past')}
-              className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
-                selectedFYFilter === 'past'
-                  ? 'bg-blue-600 text-white font-bold'
-                  : 'bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100'
-              }`}
-            >
-              前期以前 ({summary.pastFYCount})
-            </button>
-
-            {/* Individual FY dropdown if multiple */}
-            {fiscalYears.length > 1 && (
-              <select
-                aria-label="特定の事業年度で絞り込み"
-                value={
-                  selectedFYFilter !== 'all' &&
-                  selectedFYFilter !== 'current' &&
-                  selectedFYFilter !== 'past'
-                    ? selectedFYFilter
-                    : ''
-                }
-                onChange={e => {
-                  if (e.target.value) {
-                    setSelectedFYFilter(e.target.value);
-                  }
-                }}
-                className="px-2 py-0.5 bg-slate-50 border border-slate-200 rounded text-[11px] font-medium text-slate-700 cursor-pointer"
-              >
-                <option value="">個別期数指定...</option>
-                {fiscalYears.map(fy => (
-                  <option key={fy.id} value={fy.id}>
-                    {fy.name}
-                  </option>
-                ))}
-              </select>
-            )}
+            {fiscalYears
+              .filter(fy => fy.periodNumber < currentFY.periodNumber)
+              .map(fy => {
+                const count = allSoldProperties.filter(p => p.soldFY?.id === fy.id).length;
+                return (
+                  <button
+                    key={fy.id}
+                    type="button"
+                    onClick={() => setSelectedFYFilter(fy.id)}
+                    className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
+                      selectedFYFilter === fy.id
+                        ? 'bg-blue-600 text-white font-bold'
+                        : 'bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100'
+                    }`}
+                  >
+                    第{fy.periodNumber}期 ({count})
+                  </button>
+                );
+              })}
           </div>
 
           {/* Property Type Filter */}
@@ -593,12 +550,12 @@ export const SoldPropertiesView: React.FC<SoldPropertiesViewProps> = ({
           <div>
             <h3 className="text-sm font-bold text-slate-800">
               {allSoldProperties.length === 0
-                ? '売却完了（完売）の物件はまだありません'
+                ? '前期以前に売却完了（完売）した物件はありません'
                 : '該当する売却済み物件が見つかりませんでした'}
             </h3>
             <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
               {allSoldProperties.length === 0
-                ? '物件の販売がすべて決済完了し、棚卸残高が0（完売）になると、こちらの売却済み物件一覧に自動で蓄積されます。'
+                ? `※第${currentFY.periodNumber}期（当期）中に売却された物件は「物件一覧」画面に表示されます。決算繰越（年度更新）を行うと、前期以前に完売した物件がこちらの売却済み台帳に自動集約されます。`
                 : '検索キーワードや年度・種別の絞り込み条件を変更してお試しください。'}
             </p>
           </div>

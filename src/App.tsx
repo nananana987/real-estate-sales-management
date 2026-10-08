@@ -29,6 +29,7 @@ import {
   calculatePropertyFinancials,
   formatCurrency,
   isDateInFiscalYear,
+  isPropertySoldInPriorPeriod,
 } from './utils/calculations';
 import { Header } from './components/Header';
 import { PropertyFilterBar, StatusFilterOption, PeriodFilterOption, SortOption } from './components/PropertyFilterBar';
@@ -224,24 +225,27 @@ export default function App() {
     saveProperties(updated);
   };
 
-  // 進行中・保有中物件と完売・売却済物件の仕分け
-  const { activeProperties, soldProperties } = useMemo(() => {
-    const active: Property[] = [];
-    const sold: Property[] = [];
+  // 当期物件一覧（進行中・保有中 ＋ 当期中に売却済みの物件）と、前期以前に売却済みの物件の仕分け
+  const { currentPeriodProperties, priorSoldProperties } = useMemo(() => {
+    const currentPeriod: Property[] = [];
+    const priorSold: Property[] = [];
+
     properties.forEach(p => {
-      const fin = calculatePropertyFinancials(p, currentFY);
-      if (fin.status === 'sold_out') {
-        sold.push(p);
+      if (isPropertySoldInPriorPeriod(p, currentFY, fiscalYears)) {
+        // 前期以前に売却完了した物件 -> 売却済み台帳へ
+        priorSold.push(p);
       } else {
-        active.push(p);
+        // 当期の進行中・保有中物件 ＋ 当期中に売却済みの物件 -> メインの物件一覧へ
+        currentPeriod.push(p);
       }
     });
-    return { activeProperties: active, soldProperties: sold };
-  }, [properties, currentFY]);
 
-  // Filtered and Sorted Properties（進行中・保有中物件のみ。売却済みは除外）
+    return { currentPeriodProperties, priorSoldProperties };
+  }, [properties, currentFY, fiscalYears]);
+
+  // Filtered and Sorted Properties（当期の物件一覧: 進行中・保有中および当期売却済物件）
   const filteredProperties = useMemo(() => {
-    return activeProperties
+    return currentPeriodProperties
       .filter(property => {
         const fin = calculatePropertyFinancials(property, currentFY);
 
@@ -295,7 +299,7 @@ export default function App() {
             return (b.createdAt || '').localeCompare(a.createdAt || '');
         }
       });
-  }, [activeProperties, searchQuery, statusFilter, periodFilter, sortOption, currentFY]);
+  }, [currentPeriodProperties, searchQuery, statusFilter, periodFilter, sortOption, currentFY]);
 
   return (
     <div className="min-h-screen bg-slate-50/70 text-slate-900 flex flex-col font-sans text-xs">
@@ -327,7 +331,7 @@ export default function App() {
             setActiveTab(tab);
           }
         }}
-        soldCount={soldProperties.length}
+        soldCount={priorSoldProperties.length}
         onOpenNewPropertyModal={handleOpenNewProperty}
         onOpenFYModal={() => {
           setFyModalInitialTab('list');
@@ -456,9 +460,9 @@ export default function App() {
               onSortOptionChange={setSortOption}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
-              totalCount={activeProperties.length}
+              totalCount={currentPeriodProperties.length}
               filteredCount={filteredProperties.length}
-              soldCount={soldProperties.length}
+              soldCount={priorSoldProperties.length}
               onNavigateToSoldProperties={() => setActiveTab('sold_properties')}
               onPrint={() => window.print()}
             />
@@ -479,7 +483,7 @@ export default function App() {
                     ? '保有中 (棚卸)'
                     : statusFilter === 'partially_sold'
                     ? '一部売却済'
-                    : '完売'
+                    : '当期完売'
                 }
                 periodFilterLabel={
                   periodFilter === 'all'

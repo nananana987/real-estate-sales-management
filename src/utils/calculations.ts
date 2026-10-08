@@ -228,6 +228,89 @@ export function getStatusLabel(status: PropertyStatus): string {
   }
 }
 
+/**
+ * 物件が対象事業年度(fy)の「前期以前」に売却済み（完売）となったかを判定
+ * - 完売物件で、かつすべての売却決済日が当期開始日より前、あるいは所属期が前期以前の場合にtrue
+ */
+export function isPropertySoldInPriorPeriod(
+  property: Property,
+  fy: FiscalYear,
+  fiscalYears?: FiscalYear[]
+): boolean {
+  const { status } = determinePropertyStatus(property);
+  if (status !== 'sold_out') {
+    return false;
+  }
+
+  const sales = property.sales || [];
+  const settledSales = sales.filter(s => !!s.settlementDate);
+
+  // 1. 決済日がある売上による判定
+  if (settledSales.length > 0) {
+    // 当期内に決済売上がある場合は当期売却なので、前期以前ではない
+    const hasCurrentSale = settledSales.some(s => isDateInFiscalYear(s.settlementDate, fy));
+    if (hasCurrentSale) {
+      return false;
+    }
+
+    // すべての売上決済日が当期開始日より前なら、前期以前に売却済み
+    const allBeforeCurrent = settledSales.every(s => isDateBeforeFiscalYear(s.settlementDate, fy));
+    if (allBeforeCurrent) {
+      return true;
+    }
+  }
+
+  // 2. 契約日での判定（決済日が空の場合）
+  const datedSales = sales.filter(s => !!(s.settlementDate || s.contractDate));
+  if (datedSales.length > 0) {
+    const hasCurrentSale = datedSales.some(s => {
+      const d = s.settlementDate || s.contractDate;
+      return isDateInFiscalYear(d, fy);
+    });
+    if (hasCurrentSale) {
+      return false;
+    }
+
+    const allBeforeCurrent = datedSales.every(s => {
+      const d = s.settlementDate || s.contractDate;
+      return isDateBeforeFiscalYear(d, fy);
+    });
+    if (allBeforeCurrent) {
+      return true;
+    }
+  }
+
+  // 3. 所属事業年度（fiscalYearId）による判定
+  if (property.fiscalYearId && fiscalYears && fiscalYears.length > 0) {
+    const propFY = fiscalYears.find(f => f.id === property.fiscalYearId);
+    if (propFY && propFY.periodNumber < fy.periodNumber) {
+      return true;
+    }
+  }
+
+  // 4. 仕入決済日も前期以前で、当期取引が一切ない場合
+  if (isDateBeforeFiscalYear(property.settlementDate, fy)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * 物件が対象事業年度(fy)の「当期中」に売却済み（完売）となったかを判定
+ */
+export function isPropertySoldInCurrentPeriod(
+  property: Property,
+  fy: FiscalYear,
+  fiscalYears?: FiscalYear[]
+): boolean {
+  const { status } = determinePropertyStatus(property);
+  if (status !== 'sold_out') {
+    return false;
+  }
+  return !isPropertySoldInPriorPeriod(property, fy, fiscalYears);
+}
+
 export function getStatusBadgeClass(status: PropertyStatus): { bg: string; text: string; border: string; dot: string } {
   switch (status) {
     case 'contracted_unsettled':
