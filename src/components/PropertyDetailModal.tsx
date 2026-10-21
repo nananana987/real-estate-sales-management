@@ -255,7 +255,11 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     </td>
                     <td className="py-1.5 px-3">{cost.payee}</td>
                     <td className="py-1.5 px-3 font-mono">{cost.paymentDate}</td>
-                    <td className="py-1.5 px-3 text-right font-mono font-bold text-blue-700">
+                    <td
+                      className={`py-1.5 px-3 text-right font-mono font-bold ${
+                        cost.amount < 0 ? 'text-red-600' : 'text-blue-700'
+                      }`}
+                    >
                       {formatCurrency(cost.amount)}
                     </td>
                     <td className="py-1.5 px-3 text-slate-500">{cost.memo || '-'}</td>

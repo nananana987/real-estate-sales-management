@@ -336,7 +336,10 @@ function normalizeDate(val: string | undefined): string {
  */
 function parseNumber(val: string | undefined): number {
   if (!val) return 0;
-  const clean = val.replace(/[¥,円\s]/g, '');
+  const clean = val
+    .replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xfee0))
+    .replace(/[－ー▲△]/g, '-')
+    .replace(/[¥,，円\s]/g, '');
   const num = parseFloat(clean);
   return isNaN(num) ? 0 : num;
 }
@@ -678,8 +681,8 @@ export function parseIncidentalCostsCsv(
       }
     }
 
-    if (amount <= 0) {
-      errors.push('金額が入力されていないか、0円以下です');
+    if (!amount || amount === 0) {
+      errors.push('金額が入力されていないか、0円です');
     }
 
     if (!paymentDate) {

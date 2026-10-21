@@ -113,7 +113,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
   const [newCostType, setNewCostType] = useState<string>('造成費用');
   const [newCostPayee, setNewCostPayee] = useState('');
   const [newCostPaymentDate, setNewCostPaymentDate] = useState('');
-  const [newCostAmount, setNewCostAmount] = useState<number | ''>('');
+  const [newCostAmount, setNewCostAmount] = useState<string>('');
   const [newCostMemo, setNewCostMemo] = useState('');
 
   // Sales Records List
@@ -295,7 +295,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
     setNewCostType(cost.costType || '造成費用');
     setNewCostPayee(cost.payee || '');
     setNewCostPaymentDate(cost.paymentDate || '');
-    setNewCostAmount(cost.amount || '');
+    setNewCostAmount(cost.amount !== undefined && cost.amount !== null ? String(cost.amount) : '');
     setNewCostMemo(cost.memo || '');
   };
 
@@ -317,8 +317,13 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
       alert('費用の種類（項目名）を入力してください');
       return;
     }
-    if (!newCostAmount || Number(newCostAmount) <= 0) {
-      alert('金額を正しく入力してください');
+    const normalizedAmountStr = String(newCostAmount)
+      .replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xfee0))
+      .replace(/[－ー▲△]/g, '-')
+      .replace(/[,，¥円\s]/g, '');
+    const parsedAmount = Number(normalizedAmountStr);
+    if (normalizedAmountStr === '' || normalizedAmountStr === '-' || isNaN(parsedAmount) || parsedAmount === 0) {
+      alert('金額を正しく入力してください（マイナス金額も入力可能です）');
       return;
     }
 
@@ -331,7 +336,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
             costType: trimmedType,
             payee: newCostPayee,
             paymentDate: newCostPaymentDate || new Date().toISOString().slice(0, 10),
-            amount: Number(newCostAmount),
+            amount: parsedAmount,
             memo: newCostMemo,
           };
         }
@@ -347,7 +352,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
         costType: trimmedType,
         payee: newCostPayee,
         paymentDate: newCostPaymentDate || new Date().toISOString().slice(0, 10),
-        amount: Number(newCostAmount),
+        amount: parsedAmount,
         memo: newCostMemo,
       };
       setIncidentalCosts([...incidentalCosts, newCost]);
@@ -1245,18 +1250,55 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
-                      金額 (円) <span className="text-red-500">*</span>
-                    </label>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        金額 (円) <span className="text-red-500">*</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const s = String(newCostAmount).trim();
+                          if (!s) {
+                            setNewCostAmount('-');
+                          } else if (s.startsWith('-')) {
+                            setNewCostAmount(s.slice(1));
+                          } else {
+                            setNewCostAmount('-' + s);
+                          }
+                        }}
+                        className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-mono font-semibold cursor-pointer transition-colors"
+                        title="プラス・マイナスを切り替え"
+                      >
+                        ± マイナス切替
+                      </button>
+                    </div>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       value={newCostAmount}
-                      onChange={e =>
-                        setNewCostAmount(e.target.value === '' ? '' : parseFloat(e.target.value))
-                      }
-                      placeholder="例: 5200000"
-                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-500 font-mono"
+                      onChange={e => {
+                        const raw = e.target.value
+                          .replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xfee0))
+                          .replace(/[－ー▲△]/g, '-')
+                          .replace(/[,，¥円\s]/g, '');
+                        if (raw === '' || raw === '-' || /^-?\d*\.?\d*$/.test(raw)) {
+                          setNewCostAmount(raw);
+                        }
+                      }}
+                      placeholder="例: 5200000 または -50000"
+                      className={`w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-500 font-mono ${
+                        String(newCostAmount).startsWith('-') ? 'text-red-600 font-bold' : ''
+                      }`}
                     />
+                    <p className="text-[10px] text-slate-500 mt-0.5 font-mono">
+                      {newCostAmount && newCostAmount !== '-' && !isNaN(Number(newCostAmount)) ? (
+                        <span className={Number(newCostAmount) < 0 ? 'text-red-600 font-bold' : ''}>
+                          {formatCurrency(Number(newCostAmount))}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">※マイナス（返金・減額等）も入力可</span>
+                      )}
+                    </p>
                   </div>
 
                   <div className={editingCostId ? 'md:col-span-2' : 'md:col-span-3'}>
@@ -1356,7 +1398,11 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                               </td>
                               <td className="py-2 px-3 text-slate-600">{cost.payee || '-'}</td>
                               <td className="py-2 px-3 font-mono text-slate-600">{cost.paymentDate}</td>
-                              <td className="py-2 px-3 text-right font-bold text-slate-900 font-mono">
+                              <td
+                                className={`py-2 px-3 text-right font-bold font-mono ${
+                                  cost.amount < 0 ? 'text-red-600' : 'text-slate-900'
+                                }`}
+                              >
                                 {formatCurrency(cost.amount)}
                               </td>
                               <td className="py-2 px-3 text-slate-500 text-[11px] truncate max-w-xs">

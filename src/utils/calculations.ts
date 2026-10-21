@@ -13,7 +13,11 @@ export const SQM_TO_TSUBO = 0.3025;
 
 export function formatCurrency(amount: number | undefined | null): string {
   if (amount === undefined || amount === null || isNaN(amount)) return '¥0';
-  return '¥' + Math.round(amount).toLocaleString('ja-JP');
+  const rounded = Math.round(amount);
+  if (rounded < 0) {
+    return '-¥' + Math.abs(rounded).toLocaleString('ja-JP');
+  }
+  return '¥' + rounded.toLocaleString('ja-JP');
 }
 
 export function formatArea(sqm: number | undefined | null): { sqm: string; tsubo: string } {

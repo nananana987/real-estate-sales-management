@@ -439,7 +439,11 @@ export const PropertyTableView: React.FC<PropertyTableViewProps> = ({
                                         </td>
                                         <td className="py-1.5 px-3 text-slate-700">{cost.payee || '-'}</td>
                                         <td className="py-1.5 px-3 font-mono text-slate-600">{cost.paymentDate || '-'}</td>
-                                        <td className="py-1.5 px-3 text-right font-mono font-bold text-blue-700">
+                                        <td
+                                          className={`py-1.5 px-3 text-right font-mono font-bold ${
+                                            cost.amount < 0 ? 'text-red-600' : 'text-blue-700'
+                                          }`}
+                                        >
                                           {formatCurrency(cost.amount)}
                                         </td>
                                       </tr>
