@@ -261,7 +261,22 @@ export default function App() {
           const matchSeller = property.sellerName?.toLowerCase().includes(q) || false;
           const matchLandCategory = property.landCategory?.toLowerCase().includes(q) || false;
           const matchBuyer = (property.sales || []).some(s => s.buyerName?.toLowerCase().includes(q));
-          if (!matchCode && !matchName && !matchLoc && !matchSeller && !matchLandCategory && !matchBuyer) {
+          const matchIncidentalPayee = (property.incidentalCosts || []).some(
+            c =>
+              c.payee?.toLowerCase().includes(q) ||
+              c.costType?.toLowerCase().includes(q) ||
+              c.customCostTypeName?.toLowerCase().includes(q) ||
+              c.memo?.toLowerCase().includes(q)
+          );
+          if (
+            !matchCode &&
+            !matchName &&
+            !matchLoc &&
+            !matchSeller &&
+            !matchLandCategory &&
+            !matchBuyer &&
+            !matchIncidentalPayee
+          ) {
             return false;
           }
         }

@@ -71,7 +71,7 @@ export const PropertyFilterBar: React.FC<PropertyFilterBarProps> = ({
             type="text"
             value={searchQuery}
             onChange={e => onSearchChange(e.target.value)}
-            placeholder="物件名、所在地、管理コード、仕入先、買主名で検索..."
+            placeholder="物件名、所在地、管理コード、仕入先、買主名、付随費用の支払先で検索..."
             className="w-full pl-8.5 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-md focus:outline-hidden focus:ring-1 focus:ring-blue-600 focus:bg-white"
           />
         </div>

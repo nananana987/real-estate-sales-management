@@ -134,8 +134,14 @@ export const SoldPropertiesView: React.FC<SoldPropertiesViewProps> = ({
           const matchLoc = (prop.location || '').toLowerCase().includes(q);
           const matchSeller = (prop.sellerName || '').toLowerCase().includes(q);
           const matchBuyer = item.buyerNamesDisplay.toLowerCase().includes(q);
-          const matchBroker = (prop.broker || '').toLowerCase().includes(q);
-          if (!matchCode && !matchName && !matchLoc && !matchSeller && !matchBuyer && !matchBroker) {
+          const matchIncidentalPayee = (prop.incidentalCosts || []).some(
+            c =>
+              c.payee?.toLowerCase().includes(q) ||
+              c.costType?.toLowerCase().includes(q) ||
+              c.customCostTypeName?.toLowerCase().includes(q) ||
+              c.memo?.toLowerCase().includes(q)
+          );
+          if (!matchCode && !matchName && !matchLoc && !matchSeller && !matchBuyer && !matchIncidentalPayee) {
             return false;
           }
         }
@@ -423,7 +429,7 @@ export const SoldPropertiesView: React.FC<SoldPropertiesViewProps> = ({
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="物件名、所在地、管理コード、仕入先、買主名、仲介で検索..."
+              placeholder="物件名、所在地、管理コード、仕入先、買主名、付随費用の支払先で検索..."
               className="w-full pl-8.5 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-md focus:outline-hidden focus:ring-1 focus:ring-blue-600 focus:bg-white"
             />
           </div>
