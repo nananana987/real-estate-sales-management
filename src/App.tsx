@@ -258,7 +258,14 @@ export default function App() {
           const matchCode = property.code ? property.code.toLowerCase().includes(q) : false;
           const matchName = property.name ? property.name.toLowerCase().includes(q) : false;
           const matchLoc = property.location ? property.location.toLowerCase().includes(q) : false;
-          const matchSeller = property.sellerName?.toLowerCase().includes(q) || false;
+          const matchSeller =
+            property.sellerName?.toLowerCase().includes(q) ||
+            (property.purchases || []).some(
+              p =>
+                p.sellerName?.toLowerCase().includes(q) ||
+                p.sellerAddress?.toLowerCase().includes(q) ||
+                p.label?.toLowerCase().includes(q)
+            );
           const matchLandCategory = property.landCategory?.toLowerCase().includes(q) || false;
           const matchBuyer = (property.sales || []).some(s => s.buyerName?.toLowerCase().includes(q));
           const matchIncidentalPayee = (property.incidentalCosts || []).some(

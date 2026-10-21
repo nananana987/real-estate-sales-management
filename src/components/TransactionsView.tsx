@@ -19,6 +19,8 @@ import {
   formatCurrency,
   isDateInFiscalYear,
   getPropertyTypeBadgeClass,
+  getPropertyPurchases,
+  getPurchaseRecordFixedAssetTax,
 } from '../utils/calculations';
 import { downloadCSV } from '../utils/storage';
 
@@ -73,6 +75,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   // 2. 当期仕入物件 (決済日が当期内)
   const currentPurchases: {
     property: Property;
+    purchaseLabel?: string;
     settlementDate: string;
     sellerName: string;
     sellerAddress: string;
@@ -101,6 +104,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   // 4. 未決済・契約中 (仕入未決済 or 手付金のみ支払済)
   const pendingPurchases: {
     property: Property;
+    purchaseLabel?: string;
+    sellerName?: string;
     contractDate: string;
     statusLabel: string;
     depositAmount: number;
@@ -172,49 +177,48 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
       }
     });
 
-    // Purchases in FY
-    if (isDateInFiscalYear(prop.settlementDate, currentFY)) {
-      const pTaxLand = prop.fixedAssetTaxSettlementLand || 0;
-      const pTaxBldg =
-        (prop.fixedAssetTaxSettlementBuilding || 0) +
-        (prop.fixedAssetTaxSettlementBuildingTax || 0);
-      const legacyTax =
-        !prop.fixedAssetTaxSettlementLand && !prop.fixedAssetTaxSettlementBuilding
-          ? prop.fixedAssetTaxSettlement || 0
-          : 0;
-      const fixedAssetTax = pTaxLand + pTaxBldg + legacyTax;
+    // Purchases in FY (複数仕入レコード対応)
+    const propPurchases = getPropertyPurchases(prop);
+    let assignedIncidentalToFirstRow = false;
 
-      // legacyTax（内訳未分離の旧データ）：建物のみ物件なら建物へ、それ以外は土地へ配分
-      const allocLegacyLand = prop.propertyType === 'building' ? 0 : legacyTax;
-      const allocLegacyBldg = prop.propertyType === 'building' ? legacyTax : 0;
+    propPurchases.forEach((p, pIdx) => {
+      if (isDateInFiscalYear(p.settlementDate, currentFY)) {
+        const pTax = getPurchaseRecordFixedAssetTax(p);
+        const effectiveTaxLand = pTax.land;
+        const effectiveTaxBldg = pTax.building + pTax.buildingTax;
+        const fixedAssetTax = pTax.total;
 
-      const effectiveTaxLand = pTaxLand + allocLegacyLand;
-      const effectiveTaxBldg = pTaxBldg + allocLegacyBldg;
+        const bldgPriceGross = (p.buildingPurchasePrice || 0) + (p.buildingPurchaseTax || 0);
+        const landPriceWithTax = (p.landPurchasePrice || 0) + effectiveTaxLand;
+        const buildingPriceWithTax = bldgPriceGross + effectiveTaxBldg;
+        const totalBasePrice = landPriceWithTax + buildingPriceWithTax;
 
-      // 土地仕入、建物仕入の金額にそれぞれの固定資産税精算金を合計
-      const landPriceWithTax = (prop.landPurchasePrice || 0) + effectiveTaxLand;
-      const buildingPriceWithTax = (prop.buildingPurchasePrice || 0) + effectiveTaxBldg;
-      const totalBasePrice = landPriceWithTax + buildingPriceWithTax;
+        const sellerAddress = p.sellerAddress || '-';
+        const purchaseLabel =
+          propPurchases.length > 1 ? p.label || `仕入#${pIdx + 1}` : p.label || undefined;
 
-      const sellerAddress = prop.sellerAddress || '-';
+        const rowIncidental = !assignedIncidentalToFirstRow ? fin.incidentalCostsTotal : 0;
+        assignedIncidentalToFirstRow = true;
 
-      currentPurchases.push({
-        property: prop,
-        settlementDate: prop.settlementDate!,
-        sellerName: prop.sellerName || '売主',
-        sellerAddress,
-        landPriceRaw: prop.landPurchasePrice || 0,
-        buildingPriceRaw: prop.buildingPurchasePrice || 0,
-        landPriceWithTax,
-        buildingPriceWithTax,
-        taxLand: effectiveTaxLand,
-        taxBldg: effectiveTaxBldg,
-        fixedAssetTax,
-        totalBasePrice,
-        incidentalCostTotal: fin.incidentalCostsTotal,
-        totalCost: totalBasePrice + fin.incidentalCostsTotal,
-      });
-    }
+        currentPurchases.push({
+          property: prop,
+          purchaseLabel,
+          settlementDate: p.settlementDate!,
+          sellerName: p.sellerName || '売主',
+          sellerAddress,
+          landPriceRaw: p.landPurchasePrice || 0,
+          buildingPriceRaw: bldgPriceGross,
+          landPriceWithTax,
+          buildingPriceWithTax,
+          taxLand: effectiveTaxLand,
+          taxBldg: effectiveTaxBldg,
+          fixedAssetTax,
+          totalBasePrice,
+          incidentalCostTotal: rowIncidental,
+          totalCost: totalBasePrice + rowIncidental,
+        });
+      }
+    });
 
     // Incidental Costs in FY
     (prop.incidentalCosts || []).forEach(cost => {
@@ -230,21 +234,28 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
       }
     });
 
-    // Pending Purchases
-    if (!prop.settlementDate && prop.contractDate) {
-      const fixedAssetTax = fin.purchaseFixedAssetTaxTotal;
-      pendingPurchases.push({
-        property: prop,
-        contractDate: prop.contractDate,
-        statusLabel: fin.statusLabel,
-        depositAmount: prop.depositAmount || 0,
-        depositDate: prop.depositSettlementDate,
-        contractPrice:
-          (prop.landPurchasePrice || 0) +
-          (prop.buildingPurchasePrice || 0) +
-          fixedAssetTax,
-      });
-    }
+    // Pending Purchases (未決済の各仕入レコード)
+    propPurchases.forEach((p, pIdx) => {
+      if (!p.settlementDate && p.contractDate) {
+        const pTax = getPurchaseRecordFixedAssetTax(p);
+        const bldgGross = (p.buildingPurchasePrice || 0) + (p.buildingPurchaseTax || 0);
+        const purchaseLabel =
+          propPurchases.length > 1 ? p.label || `仕入#${pIdx + 1}` : p.label || undefined;
+        const itemStatusLabel = p.depositSettlementDate
+          ? '手付金支払済 (決済待ち)'
+          : '仕入契約済 (未決済)';
+        pendingPurchases.push({
+          property: prop,
+          purchaseLabel,
+          sellerName: p.sellerName || undefined,
+          contractDate: p.contractDate,
+          statusLabel: propPurchases.length > 1 ? itemStatusLabel : fin.statusLabel,
+          depositAmount: p.depositAmount || 0,
+          depositDate: p.depositSettlementDate,
+          contractPrice: (p.landPurchasePrice || 0) + bldgGross + pTax.total,
+        });
+      }
+    });
   });
 
   // Sort
@@ -731,6 +742,11 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
                               </span>
                             );
                           })()}
+                          {p.purchaseLabel && (
+                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                              {p.purchaseLabel}
+                            </span>
+                          )}
                         </div>
                         <div className="font-semibold text-slate-800">
                           {p.property.location || p.property.name}

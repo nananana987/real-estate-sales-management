@@ -20,6 +20,8 @@ import {
   formatArea,
   getStatusBadgeClass,
   getPurchaseFixedAssetTax,
+  getPurchaseRecordFixedAssetTax,
+  getPropertyPurchases,
   getSaleFixedAssetTax,
   getPropertyTypeBadgeClass,
 } from '../utils/calculations';
@@ -397,41 +399,90 @@ export const PropertyTableView: React.FC<PropertyTableViewProps> = ({
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-slate-100">
-                                    {property.landPurchasePrice > 0 && (
-                                      <tr className="hover:bg-slate-50/80 transition-colors">
-                                        <td className="py-1.5 px-3 font-bold text-slate-800">土地仕入本体</td>
-                                        <td className="py-1.5 px-3 text-slate-700">{property.sellerName || '-'}</td>
-                                        <td className="py-1.5 px-3 font-mono text-slate-600">{property.settlementDate || '未決済'}</td>
-                                        <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900">
-                                          {formatCurrency(property.landPurchasePrice)}
-                                        </td>
-                                      </tr>
-                                    )}
-                                    {property.buildingPurchasePrice > 0 && (
-                                      <tr className="hover:bg-slate-50/80 transition-colors">
-                                        <td className="py-1.5 px-3 font-bold text-slate-800">建物仕入本体</td>
-                                        <td className="py-1.5 px-3 text-slate-700">{property.sellerName || '-'}</td>
-                                        <td className="py-1.5 px-3 font-mono text-slate-600">{property.settlementDate || '未決済'}</td>
-                                        <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900">
-                                          {formatCurrency(property.buildingPurchasePrice)}
-                                        </td>
-                                      </tr>
-                                    )}
-                                    {fin.purchaseFixedAssetTaxTotal > 0 && (
-                                      <tr className="hover:bg-slate-50/80 transition-colors">
-                                        <td className="py-1.5 px-3 font-bold text-slate-800">
-                                          固定資産税等精算金 (支払)
-                                          <span className="block text-[10px] font-normal text-slate-500">
-                                            内訳: 土地(非課税) {formatCurrency(fin.purchaseFixedAssetTaxLand)} / 建物(税込) {formatCurrency(fin.purchaseFixedAssetTaxBuilding + fin.purchaseFixedAssetTaxBuildingTax)}
-                                          </span>
-                                        </td>
-                                        <td className="py-1.5 px-3 text-slate-700">{property.sellerName || '-'}</td>
-                                        <td className="py-1.5 px-3 font-mono text-slate-600">{property.settlementDate || '-'}</td>
-                                        <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900">
-                                          {formatCurrency(fin.purchaseFixedAssetTaxTotal)}
-                                        </td>
-                                      </tr>
-                                    )}
+                                    {(() => {
+                                      const purchases = getPropertyPurchases(property);
+                                      return purchases.map((p, idx) => {
+                                        const pTax = getPurchaseRecordFixedAssetTax(p);
+                                        const bldgGross =
+                                          (p.buildingPurchasePrice || 0) +
+                                          (p.buildingPurchaseTax || 0);
+                                        const prefix =
+                                          purchases.length > 1
+                                            ? p.label
+                                              ? `[${p.label}] `
+                                              : `[仕入#${idx + 1}] `
+                                            : '';
+                                        return (
+                                          <React.Fragment key={p.id || idx}>
+                                            {(p.landPurchasePrice || 0) > 0 && (
+                                              <tr className="hover:bg-slate-50/80 transition-colors">
+                                                <td className="py-1.5 px-3 font-bold text-slate-800">
+                                                  {prefix}土地仕入本体
+                                                  {p.landArea ? (
+                                                    <span className="ml-1 text-[10px] font-normal text-slate-500">
+                                                      ({p.landArea}㎡)
+                                                    </span>
+                                                  ) : null}
+                                                </td>
+                                                <td className="py-1.5 px-3 text-slate-700">
+                                                  {p.sellerName || '-'}
+                                                </td>
+                                                <td className="py-1.5 px-3 font-mono text-slate-600">
+                                                  {p.settlementDate || '未決済'}
+                                                </td>
+                                                <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900">
+                                                  {formatCurrency(p.landPurchasePrice)}
+                                                </td>
+                                              </tr>
+                                            )}
+                                            {bldgGross > 0 && (
+                                              <tr className="hover:bg-slate-50/80 transition-colors">
+                                                <td className="py-1.5 px-3 font-bold text-slate-800">
+                                                  {prefix}建物仕入本体
+                                                  {p.buildingArea ? (
+                                                    <span className="ml-1 text-[10px] font-normal text-slate-500">
+                                                      ({p.buildingArea}㎡)
+                                                    </span>
+                                                  ) : null}
+                                                </td>
+                                                <td className="py-1.5 px-3 text-slate-700">
+                                                  {p.sellerName || '-'}
+                                                </td>
+                                                <td className="py-1.5 px-3 font-mono text-slate-600">
+                                                  {p.settlementDate || '未決済'}
+                                                </td>
+                                                <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900">
+                                                  {formatCurrency(bldgGross)}
+                                                </td>
+                                              </tr>
+                                            )}
+                                            {pTax.total > 0 && (
+                                              <tr className="hover:bg-slate-50/80 transition-colors">
+                                                <td className="py-1.5 px-3 font-bold text-slate-800">
+                                                  {prefix}固定資産税等精算金 (支払)
+                                                  <span className="block text-[10px] font-normal text-slate-500">
+                                                    内訳: 土地(非課税) {formatCurrency(pTax.land)} /
+                                                    建物(税込){' '}
+                                                    {formatCurrency(
+                                                      pTax.building + pTax.buildingTax
+                                                    )}
+                                                  </span>
+                                                </td>
+                                                <td className="py-1.5 px-3 text-slate-700">
+                                                  {p.sellerName || '-'}
+                                                </td>
+                                                <td className="py-1.5 px-3 font-mono text-slate-600">
+                                                  {p.settlementDate || '-'}
+                                                </td>
+                                                <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900">
+                                                  {formatCurrency(pTax.total)}
+                                                </td>
+                                              </tr>
+                                            )}
+                                          </React.Fragment>
+                                        );
+                                      });
+                                    })()}
                                     {(property.incidentalCosts || []).map(cost => (
                                       <tr key={cost.id} className="hover:bg-slate-50/80 transition-colors">
                                         <td className="py-1.5 px-3 font-semibold text-blue-800">

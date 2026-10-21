@@ -69,20 +69,43 @@ export interface SaleRecord {
   memo?: string;
 }
 
+export interface PurchaseRecord {
+  id: string;
+  propertyId?: string;
+  label?: string; // 仕入区分・対象ラベル (例: "土地分", "建物分", "北側隣地", "持分1/2")
+  sellerName: string; // 仕入先 名前 (売主名)
+  sellerAddress: string; // 仕入先 住所
+  purchaseType?: PropertyType; // 種類 (土地 / 建物 / 土地＋建物)
+  landArea?: number; // 対象土地面積 (㎡)
+  buildingArea?: number; // 対象建物面積 (㎡)
+  contractDate: string; // 契約日 (YYYY-MM-DD)
+  landPurchasePrice: number; // 土地仕入金額 (非課税)
+  buildingPurchasePrice: number; // 建物仕入金額 (税込)
+  buildingPurchaseTax?: number; // 建物仕入消費税
+  settlementDate?: string; // 決済日・引渡支払日 (YYYY-MM-DD)
+  depositAmount?: number; // 手付金額
+  depositSettlementDate?: string; // 手付金決済支払日 (YYYY-MM-DD)
+  fixedAssetTaxSettlementLand?: number; // 固定資産税等精算金 (土地・非課税)
+  fixedAssetTaxSettlementBuilding?: number; // 固定資産税等精算金 (建物・税込)
+  fixedAssetTaxSettlementBuildingTax?: number; // 固定資産税等精算金 (建物消費税)
+  fixedAssetTaxSettlement?: number; // 固定資産税等精算金 合計
+  memo?: string; // 備考
+}
+
 export interface Property {
   id: string;
   code: string; // 管理番号 (例: 26001 - 西暦下2桁+001連番)
   name?: string; // (互換用)
   location: string; // 物件所在地 / 地番
   fiscalYearId?: string; // 登録年度ID (例: "fy-2026")
-  sellerName: string; // 仕入先 名前
+  sellerName: string; // 仕入先 名前 (複数の場合は合算表示用)
   sellerAddress: string; // 仕入先 住所
   propertyType: PropertyType; // 種類 (土地 / 建物 / 土地＋建物)
   landCategory: string; // 地目 (宅地など)
   landArea: number; // 土地面積 (㎡)
   buildingArea?: number; // 建物面積 (㎡)
   
-  // 仕入契約情報
+  // 仕入契約情報 (単一または複数仕入の合算サマリー)
   contractDate: string; // 契約日 (YYYY-MM-DD)
   landPurchasePrice: number; // 土地仕入金額
   buildingPurchasePrice: number; // 建物仕入金額
@@ -94,6 +117,9 @@ export interface Property {
   fixedAssetTaxSettlementBuilding?: number; // 固定資産税等精算金 (建物・課税)
   fixedAssetTaxSettlementBuildingTax?: number; // 固定資産税等精算金 (建物消費税)
   fixedAssetTaxSettlement?: number; // 固定資産税等精算金 合計 (支払 - 仕入原価算入)
+
+  // 複数仕入レコード (土地・建物別売主や複数筆の合算管理用)
+  purchases?: PurchaseRecord[];
 
   // 繰越情報 (前期からの繰越物件の場合)
   isCarriedOver?: boolean;

@@ -21,11 +21,13 @@ import {
   IncidentalCostType,
   SaleRecord,
   SaleCategory,
+  PurchaseRecord,
   FiscalYear,
 } from '../types';
 import {
   formatCurrency,
   SQM_TO_TSUBO,
+  getPropertyPurchases,
 } from '../utils/calculations';
 import { generateNextPropertyCode } from '../utils/codeGenerator';
 import { DateInput } from './DateInput';
@@ -80,24 +82,13 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
   // Form State
   const [code, setCode] = useState('');
   const [location, setLocation] = useState('');
-  const [sellerName, setSellerName] = useState('');
-  const [sellerAddress, setSellerAddress] = useState('');
   const [propertyType, setPropertyType] = useState<PropertyType>('land');
   const [landCategory, setLandCategory] = useState<string>('宅地');
   const [landArea, setLandArea] = useState<number | ''>('');
   const [buildingArea, setBuildingArea] = useState<number | ''>('');
 
-  // Purchase Contract (税込経理)
-  const [contractDate, setContractDate] = useState('');
-  const [landPurchasePrice, setLandPurchasePrice] = useState<number | ''>('');
-  const [buildingPurchasePrice, setBuildingPurchasePrice] = useState<number | ''>('');
-  const [settlementDate, setSettlementDate] = useState('');
-  const [depositAmount, setDepositAmount] = useState<number | ''>('');
-  const [depositSettlementDate, setDepositSettlementDate] = useState('');
-
-  // 固定資産税等精算金（土地非課税 / 建物税込）
-  const [fixedAssetTaxLand, setFixedAssetTaxLand] = useState<number | ''>('');
-  const [fixedAssetTaxBuilding, setFixedAssetTaxBuilding] = useState<number | ''>('');
+  // Multiple Purchase Records (税込経理)
+  const [purchases, setPurchases] = useState<PurchaseRecord[]>([]);
 
   const [isCarriedOver, setIsCarriedOver] = useState(false);
   const [initialInventoryCost, setInitialInventoryCost] = useState<number | ''>('');
@@ -127,32 +118,42 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
     if (editingProperty) {
       setCode(editingProperty.code ? editingProperty.code.replace(/^P-?/i, '') : '');
       setLocation(editingProperty.location || '');
-      setSellerName(editingProperty.sellerName || '');
-      setSellerAddress(editingProperty.sellerAddress || '');
       setPropertyType(editingProperty.propertyType || 'land');
       setLandCategory(editingProperty.landCategory || '宅地');
       setLandArea(editingProperty.landArea || '');
       setBuildingArea(editingProperty.buildingArea || '');
 
-      setContractDate(editingProperty.contractDate || '');
-      setLandPurchasePrice(editingProperty.landPurchasePrice || 0);
-      // 税込金額として統合
-      const bldgGross = (editingProperty.buildingPurchasePrice || 0) + (editingProperty.buildingPurchaseTax || 0);
-      setBuildingPurchasePrice(bldgGross);
-
-      setSettlementDate(editingProperty.settlementDate || '');
-      setDepositAmount(editingProperty.depositAmount || 0);
-      setDepositSettlementDate(editingProperty.depositSettlementDate || '');
-
-      // 固定資産税精算金 (税込)
-      if (editingProperty.fixedAssetTaxSettlementLand !== undefined || editingProperty.fixedAssetTaxSettlementBuilding !== undefined) {
-        setFixedAssetTaxLand(editingProperty.fixedAssetTaxSettlementLand || 0);
-        const bldgTaxGross = (editingProperty.fixedAssetTaxSettlementBuilding || 0) + (editingProperty.fixedAssetTaxSettlementBuildingTax || 0);
-        setFixedAssetTaxBuilding(bldgTaxGross);
-      } else {
-        setFixedAssetTaxLand(editingProperty.fixedAssetTaxSettlement || 0);
-        setFixedAssetTaxBuilding(0);
-      }
+      const rawPurchases = getPropertyPurchases(editingProperty);
+      const normalizedPurchases: PurchaseRecord[] = rawPurchases.map((p, idx) => {
+        const bldgGross = (p.buildingPurchasePrice || 0) + (p.buildingPurchaseTax || 0);
+        const taxLand =
+          p.fixedAssetTaxSettlementLand !== undefined
+            ? p.fixedAssetTaxSettlementLand || 0
+            : !p.fixedAssetTaxSettlementBuilding
+            ? p.fixedAssetTaxSettlement || 0
+            : 0;
+        const taxBldgGross =
+          (p.fixedAssetTaxSettlementBuilding || 0) +
+          (p.fixedAssetTaxSettlementBuildingTax || 0);
+        return {
+          ...p,
+          id: p.id || `purch-${Date.now()}-${idx}`,
+          sellerName: p.sellerName || '',
+          sellerAddress: p.sellerAddress || '',
+          contractDate: p.contractDate || '',
+          landPurchasePrice: p.landPurchasePrice || 0,
+          buildingPurchasePrice: bldgGross,
+          buildingPurchaseTax: 0,
+          settlementDate: p.settlementDate || '',
+          depositAmount: p.depositAmount || 0,
+          depositSettlementDate: p.depositSettlementDate || '',
+          fixedAssetTaxSettlementLand: taxLand,
+          fixedAssetTaxSettlementBuilding: taxBldgGross,
+          fixedAssetTaxSettlementBuildingTax: 0,
+          fixedAssetTaxSettlement: taxLand + taxBldgGross,
+        };
+      });
+      setPurchases(normalizedPurchases);
 
       setIsCarriedOver(editingProperty.isCarriedOver || false);
       setInitialInventoryCost(editingProperty.initialInventoryCost || 0);
@@ -175,23 +176,36 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
     } else {
       // Default new property: 西暦下2桁 + 001〜 (例: 26001)
       const nextCode = generateNextPropertyCode(existingProperties);
+      const today = new Date().toISOString().slice(0, 10);
       setCode(nextCode);
       setLocation('');
-      setSellerName('');
-      setSellerAddress('');
       setPropertyType('land');
       setLandCategory('宅地');
       setLandArea('');
       setBuildingArea('');
 
-      setContractDate(new Date().toISOString().slice(0, 10));
-      setLandPurchasePrice('');
-      setBuildingPurchasePrice('');
-      setSettlementDate('');
-      setDepositAmount('');
-      setDepositSettlementDate('');
-      setFixedAssetTaxLand('');
-      setFixedAssetTaxBuilding('');
+      setPurchases([
+        {
+          id: 'purch-' + Date.now(),
+          label: '',
+          sellerName: '',
+          sellerAddress: '',
+          purchaseType: 'land',
+          contractDate: today,
+          landPurchasePrice: 0,
+          buildingPurchasePrice: 0,
+          buildingPurchaseTax: 0,
+          settlementDate: '',
+          depositAmount: 0,
+          depositSettlementDate: '',
+          fixedAssetTaxSettlementLand: 0,
+          fixedAssetTaxSettlementBuilding: 0,
+          fixedAssetTaxSettlementBuildingTax: 0,
+          fixedAssetTaxSettlement: 0,
+          memo: '',
+        },
+      ]);
+
       setIsCarriedOver(false);
       setInitialInventoryCost('');
       setInitialInventoryNote('');
@@ -212,12 +226,21 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Summary Totals Calculation for current form
-  const curLandPrice = Number(landPurchasePrice) || 0;
-  const curBldgPrice = Number(buildingPurchasePrice) || 0;
-  const curTaxLand = Number(fixedAssetTaxLand) || 0;
-  const curTaxBldg = Number(fixedAssetTaxBuilding) || 0;
+  // Summary Totals Calculation for current form (全仕入レコードの合算)
+  const curLandPrice = purchases.reduce((acc, p) => acc + (Number(p.landPurchasePrice) || 0), 0);
+  const curBldgPrice = purchases.reduce((acc, p) => acc + (Number(p.buildingPurchasePrice) || 0), 0);
+  const curTaxLand = purchases.reduce(
+    (acc, p) => acc + (Number(p.fixedAssetTaxSettlementLand) || 0),
+    0
+  );
+  const curTaxBldg = purchases.reduce(
+    (acc, p) => acc + (Number(p.fixedAssetTaxSettlementBuilding) || 0),
+    0
+  );
   const curFixedTaxTotal = curTaxLand + curTaxBldg;
+  const hasAnySettledPurchase = purchases.some(p => !!p.settlementDate);
+  const hasAnyDepositPaid =
+    !hasAnySettledPurchase && purchases.some(p => !!p.depositSettlementDate);
 
   const curInitialCost = isCarriedOver ? Number(initialInventoryCost) || 0 : 0;
   const totalIncidental = incidentalCosts.reduce((acc, c) => acc + (c.amount || 0), 0);
@@ -231,6 +254,54 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
 
   const totalCOGS = sales.reduce((acc, s) => acc + (s.costOfGoodsSold || 0), 0);
   const endingInventory = Math.max(0, totalAcquisition - totalCOGS);
+
+  // 複数仕入レコードの追加・更新・削除ハンドラー
+  const handleAddPurchase = () => {
+    const defaultContractDate =
+      purchases[0]?.contractDate || new Date().toISOString().slice(0, 10);
+    const newPurchase: PurchaseRecord = {
+      id: `purch-${Date.now()}-${purchases.length + 1}`,
+      propertyId: editingProperty?.id || 'temp',
+      label: '',
+      sellerName: '',
+      sellerAddress: '',
+      purchaseType: propertyType,
+      contractDate: defaultContractDate,
+      landPurchasePrice: 0,
+      buildingPurchasePrice: 0,
+      buildingPurchaseTax: 0,
+      settlementDate: '',
+      depositAmount: 0,
+      depositSettlementDate: '',
+      fixedAssetTaxSettlementLand: 0,
+      fixedAssetTaxSettlementBuilding: 0,
+      fixedAssetTaxSettlementBuildingTax: 0,
+      fixedAssetTaxSettlement: 0,
+      memo: '',
+    };
+    setPurchases([...purchases, newPurchase]);
+  };
+
+  const handleUpdatePurchaseField = (
+    index: number,
+    field: keyof PurchaseRecord,
+    value: any
+  ) => {
+    const updated = [...purchases];
+    const item = { ...updated[index], [field]: value };
+    const tLand = Number(item.fixedAssetTaxSettlementLand) || 0;
+    const tBldg = Number(item.fixedAssetTaxSettlementBuilding) || 0;
+    item.fixedAssetTaxSettlement = tLand + tBldg;
+    updated[index] = item;
+    setPurchases(updated);
+  };
+
+  const handleRemovePurchase = (index: number) => {
+    if (purchases.length <= 1) return;
+    if (confirm(`仕入情報 #${index + 1} を削除しますか？`)) {
+      setPurchases(purchases.filter((_, i) => i !== index));
+    }
+  };
 
   // 地目の複数パース・選択判定・トグル処理
   const parseLandCategories = (catStr: string): string[] => {
@@ -532,28 +603,112 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
     }
 
     const cleanCode = code.trim() || generateNextPropertyCode(existingProperties);
+    const propId = editingProperty?.id || 'prop-' + Date.now();
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    const cleanedPurchases: PurchaseRecord[] = purchases.map((p, idx) => {
+      const tLand = Number(p.fixedAssetTaxSettlementLand) || 0;
+      const tBldg = Number(p.fixedAssetTaxSettlementBuilding) || 0;
+      return {
+        ...p,
+        id: p.id || `purch-${Date.now()}-${idx}`,
+        propertyId: propId,
+        label: p.label ? p.label.trim() : undefined,
+        sellerName: (p.sellerName || '').trim(),
+        sellerAddress: (p.sellerAddress || '').trim(),
+        landArea: p.landArea ? Number(p.landArea) : undefined,
+        buildingArea: p.buildingArea ? Number(p.buildingArea) : undefined,
+        contractDate: p.contractDate || todayStr,
+        landPurchasePrice: Number(p.landPurchasePrice) || 0,
+        buildingPurchasePrice: Number(p.buildingPurchasePrice) || 0,
+        buildingPurchaseTax: 0,
+        settlementDate: p.settlementDate || undefined,
+        depositAmount: Number(p.depositAmount) || 0,
+        depositSettlementDate: p.depositSettlementDate || undefined,
+        fixedAssetTaxSettlementLand: tLand,
+        fixedAssetTaxSettlementBuilding: tBldg,
+        fixedAssetTaxSettlementBuildingTax: 0,
+        fixedAssetTaxSettlement: tLand + tBldg,
+        memo: p.memo ? p.memo.trim() : undefined,
+      };
+    });
+
+    // 複数仕入レコードから物件トップレベルのサマリー項目を自動合成
+    const uniqueSellerNames = Array.from(
+      new Set(cleanedPurchases.map(p => p.sellerName).filter(Boolean))
+    );
+    const combinedSellerName = uniqueSellerNames.join('、');
+
+    const uniqueSellerAddresses = Array.from(
+      new Set(cleanedPurchases.map(p => p.sellerAddress).filter(Boolean))
+    );
+    const combinedSellerAddress = uniqueSellerAddresses.join(' / ');
+
+    const contractDates = cleanedPurchases
+      .map(p => p.contractDate)
+      .filter(Boolean)
+      .sort();
+    const primaryContractDate = contractDates[0] || todayStr;
+
+    const settledDates = cleanedPurchases
+      .map(p => p.settlementDate)
+      .filter((d): d is string => !!d)
+      .sort();
+    const latestSettlementDate =
+      settledDates.length > 0 ? settledDates[settledDates.length - 1] : undefined;
+
+    const depositDates = cleanedPurchases
+      .map(p => p.depositSettlementDate)
+      .filter((d): d is string => !!d)
+      .sort();
+    const earliestDepositDate = depositDates.length > 0 ? depositDates[0] : undefined;
+
+    const sumDeposit = cleanedPurchases.reduce((acc, p) => acc + (p.depositAmount || 0), 0);
+
+    // もし物件全体の土地面積・建物面積が未入力で、各仕入レコードに面積が入っている場合は合算値を適用
+    const purchasesLandAreaSum = cleanedPurchases.reduce(
+      (acc, p) => acc + (Number(p.landArea) || 0),
+      0
+    );
+    const purchasesBldgAreaSum = cleanedPurchases.reduce(
+      (acc, p) => acc + (Number(p.buildingArea) || 0),
+      0
+    );
+    const finalLandArea =
+      Number(landArea) > 0
+        ? Number(landArea)
+        : purchasesLandAreaSum > 0
+        ? Math.round(purchasesLandAreaSum * 100) / 100
+        : 0;
+    const finalBldgArea =
+      Number(buildingArea) > 0
+        ? Number(buildingArea)
+        : purchasesBldgAreaSum > 0
+        ? Math.round(purchasesBldgAreaSum * 100) / 100
+        : 0;
 
     const newProperty: Property = {
-      id: editingProperty?.id || 'prop-' + Date.now(),
+      id: propId,
       code: cleanCode,
       location: location.trim(),
-      sellerName: sellerName.trim(),
-      sellerAddress: sellerAddress.trim(),
+      sellerName: combinedSellerName,
+      sellerAddress: combinedSellerAddress,
       propertyType,
       landCategory,
-      landArea: Number(landArea) || 0,
-      buildingArea: Number(buildingArea) || 0,
-      contractDate: contractDate || new Date().toISOString().slice(0, 10),
-      landPurchasePrice: Number(landPurchasePrice) || 0,
-      buildingPurchasePrice: Number(buildingPurchasePrice) || 0,
+      landArea: finalLandArea,
+      buildingArea: finalBldgArea,
+      contractDate: primaryContractDate,
+      landPurchasePrice: curLandPrice,
+      buildingPurchasePrice: curBldgPrice,
       buildingPurchaseTax: 0,
-      settlementDate: settlementDate || undefined,
-      depositAmount: Number(depositAmount) || 0,
-      depositSettlementDate: depositSettlementDate || undefined,
-      fixedAssetTaxSettlementLand: Number(fixedAssetTaxLand) || 0,
-      fixedAssetTaxSettlementBuilding: Number(fixedAssetTaxBuilding) || 0,
+      settlementDate: latestSettlementDate,
+      depositAmount: sumDeposit,
+      depositSettlementDate: earliestDepositDate,
+      fixedAssetTaxSettlementLand: curTaxLand,
+      fixedAssetTaxSettlementBuilding: curTaxBldg,
       fixedAssetTaxSettlementBuildingTax: 0,
       fixedAssetTaxSettlement: curFixedTaxTotal,
+      purchases: cleanedPurchases,
       isCarriedOver,
       initialInventoryCost: isCarriedOver ? Number(initialInventoryCost) || 0 : undefined,
       initialInventoryNote: isCarriedOver ? initialInventoryNote : undefined,
@@ -588,7 +743,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                 )}
               </h2>
               <p className="text-[11px] text-slate-300 font-medium">
-                仕入情報、固定資産税精算金（土地・建物）、付随費用、売上・原価按分を一括管理
+                仕入情報（複数売主・土地建物別仕入に対応）、固定資産税精算金、付随費用、売上・原価按分を一括管理
               </p>
             </div>
           </div>
@@ -627,25 +782,25 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
           <div>
             <span
               className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                settlementDate
+                hasAnySettledPurchase
                   ? sales.length > 0 && sales.some(s => s.settlementDate)
                     ? endingInventory === 0
                       ? 'bg-slate-200 text-slate-800'
                       : 'bg-purple-100 text-purple-800'
                     : 'bg-emerald-100 text-emerald-800'
-                  : depositSettlementDate
+                  : hasAnyDepositPaid
                   ? 'bg-blue-100 text-blue-800'
                   : 'bg-amber-100 text-amber-800'
               }`}
             >
               状態: {
-                settlementDate
+                hasAnySettledPurchase
                   ? sales.length > 0 && sales.some(s => s.settlementDate)
                     ? endingInventory === 0
                       ? '売却済み (完売)'
                       : '一部売却済み (残あり)'
                     : '決済済み (棚卸保有中)'
-                  : depositSettlementDate
+                  : hasAnyDepositPaid
                   ? '手付金支払済 (決済待ち)'
                   : '仕入契約済 (未決済)'
               }
@@ -766,40 +921,11 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                   </div>
                 </div>
 
-                {/* 仕入先 */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
-                      仕入先 (売主名)
-                    </label>
-                    <input
-                      type="text"
-                      value={sellerName}
-                      onChange={e => setSellerName(e.target.value)}
-                      placeholder="例: 山田中 太郎"
-                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
-                      仕入先の住所
-                    </label>
-                    <input
-                      type="text"
-                      value={sellerAddress}
-                      onChange={e => setSellerAddress(e.target.value)}
-                      placeholder="例: 東京都世田谷区北沢2-10-5"
-                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-
                 {/* 種類・面積 */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
-                      種類
+                      物件全体の種類
                     </label>
                     <select
                       value={propertyType}
@@ -813,9 +939,27 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
-                      土地面積 (㎡)
-                    </label>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        全体土地面積 (㎡)
+                      </label>
+                      {purchases.length > 1 &&
+                        purchases.some(p => Number(p.landArea) > 0) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const sum = purchases.reduce(
+                                (acc, p) => acc + (Number(p.landArea) || 0),
+                                0
+                              );
+                              setLandArea(Math.round(sum * 100) / 100);
+                            }}
+                            className="text-[10px] text-blue-600 hover:text-blue-800 underline font-semibold cursor-pointer"
+                          >
+                            仕入内訳面積計を反映
+                          </button>
+                        )}
+                    </div>
                     <div className="relative">
                       <input
                         type="number"
@@ -835,9 +979,27 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
-                      建物面積 (㎡)
-                    </label>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        全体建物面積 (㎡)
+                      </label>
+                      {purchases.length > 1 &&
+                        purchases.some(p => Number(p.buildingArea) > 0) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const sum = purchases.reduce(
+                                (acc, p) => acc + (Number(p.buildingArea) || 0),
+                                0
+                              );
+                              setBuildingArea(Math.round(sum * 100) / 100);
+                            }}
+                            className="text-[10px] text-blue-600 hover:text-blue-800 underline font-semibold cursor-pointer"
+                          >
+                            仕入内訳面積計を反映
+                          </button>
+                        )}
+                    </div>
                     <div className="relative">
                       <input
                         type="number"
@@ -909,6 +1071,20 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                     })}
                   </div>
                 </div>
+
+                {/* 備考メモ */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
+                    社内備考・特記事項
+                  </label>
+                  <textarea
+                    value={notes}
+                    onChange={e => setNotes(e.target.value)}
+                    placeholder="道路後退、越境、建築確認、用途地域などの特記事項"
+                    rows={2}
+                    className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
               </div>
 
               {/* 前期繰越設定 */}
@@ -959,179 +1135,398 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                 )}
               </div>
 
-              {/* 仕入売買契約・金額・決済日 */}
-              <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-2xs space-y-3">
-                <h3 className="text-xs font-bold text-slate-900 border-b border-slate-100 pb-1.5 flex items-center justify-between">
-                  <div className="flex items-center space-x-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                    <span>仕入売買契約情報・本体価格</span>
-                  </div>
-                  <span className="text-[11px] font-normal text-slate-500">
-                    ※日付入力は「260401」「2026/04/01」等の直接入力に対応（→キー不要）
-                  </span>
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-                  {/* 契約日 */}
+              {/* 仕入契約情報リスト (1つの管理コードに対して複数登録可能) */}
+              <div className="space-y-3">
+                <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
-                      契約日
-                    </label>
-                    <DateInput
-                      value={contractDate}
-                      onChange={setContractDate}
-                      placeholder="例: 260401 または 2026/04/01"
-                    />
-                  </div>
-
-                  {/* 土地仕入金額 */}
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
-                      土地仕入金額 (円・非課税)
-                    </label>
-                    <input
-                      type="number"
-                      value={landPurchasePrice}
-                      onChange={e =>
-                        setLandPurchasePrice(e.target.value === '' ? '' : parseFloat(e.target.value))
-                      }
-                      placeholder="例: 120000000"
-                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-500 font-mono"
-                    />
-                    <p className="text-[10px] text-slate-500 mt-0.5 font-mono">
-                      {formatCurrency(Number(landPurchasePrice) || 0)}
+                    <h3 className="text-xs font-bold text-slate-900 flex items-center space-x-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                      <span>仕入契約・仕入先情報 ({purchases.length}件)</span>
+                      {purchases.length > 1 && (
+                        <span className="px-1.5 py-0.2 rounded text-[10px] bg-blue-100 text-blue-800 font-bold">
+                          複数仕入合算管理
+                        </span>
+                      )}
+                    </h3>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      土地と建物を別々の人から仕入れた場合や、複数人から仕入れた土地を1つの管理コードとして扱う場合は「＋ 仕入情報を追加」から複数登録できます
                     </p>
                   </div>
-
-                  {/* 建物仕入金額 (税込) */}
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
-                      建物仕入金額 (円・税込)
-                    </label>
-                    <input
-                      type="number"
-                      value={buildingPurchasePrice}
-                      onChange={e =>
-                        setBuildingPurchasePrice(e.target.value === '' ? '' : parseFloat(e.target.value))
-                      }
-                      placeholder="例: 5500000"
-                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-500 font-mono"
-                    />
-                    <p className="text-[10px] text-slate-500 mt-0.5 font-mono">
-                      {formatCurrency(Number(buildingPurchasePrice) || 0)}
-                    </p>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddPurchase}
+                    className="px-3 py-1.5 rounded bg-[#001529] hover:bg-[#002244] text-white text-xs font-semibold shadow-2xs transition-colors flex items-center space-x-1 cursor-pointer shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>仕入情報を追加</span>
+                  </button>
                 </div>
 
-                {/* 固定資産税等精算金 (土地 / 建物 税込入力) */}
-                <div className="bg-blue-50/40 p-3 rounded-lg border border-blue-100 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-blue-950 flex items-center space-x-1">
-                      <span>固定資産税等精算金 (支払・仕入原価算入)</span>
-                    </span>
-                    <span className="text-xs font-bold text-blue-700 font-mono">
-                      精算金合計: {formatCurrency(curFixedTaxTotal)}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
-                        土地分 精算金 (円・非課税)
-                      </label>
-                      <input
-                        type="number"
-                        value={fixedAssetTaxLand}
-                        onChange={e =>
-                          setFixedAssetTaxLand(e.target.value === '' ? '' : parseFloat(e.target.value))
-                        }
-                        placeholder="例: 250000"
-                        className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-500 font-mono"
-                      />
-                      <p className="text-[10px] text-slate-500 mt-0.5 font-mono">
-                        {formatCurrency(Number(fixedAssetTaxLand) || 0)}
-                      </p>
+                {/* 複数仕入時の合算サマリーバー */}
+                {purchases.length > 1 && (
+                  <div className="bg-blue-50/70 p-2.5 rounded-lg border border-blue-200 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    <div className="bg-white p-2 rounded border border-blue-100">
+                      <span className="text-[10px] text-slate-500 block">土地仕入 合計 ({purchases.length}件)</span>
+                      <span className="font-mono font-bold text-slate-900">{formatCurrency(curLandPrice)}</span>
                     </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
-                        建物分 精算金 (円・税込)
-                      </label>
-                      <input
-                        type="number"
-                        value={fixedAssetTaxBuilding}
-                        onChange={e =>
-                          setFixedAssetTaxBuilding(e.target.value === '' ? '' : parseFloat(e.target.value))
-                        }
-                        placeholder="例: 110000"
-                        className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-500 font-mono"
-                      />
-                      <p className="text-[10px] text-slate-500 mt-0.5 font-mono">
-                        {formatCurrency(Number(fixedAssetTaxBuilding) || 0)}
-                      </p>
+                    <div className="bg-white p-2 rounded border border-blue-100">
+                      <span className="text-[10px] text-slate-500 block">建物仕入 合計 (税込)</span>
+                      <span className="font-mono font-bold text-slate-900">{formatCurrency(curBldgPrice)}</span>
+                    </div>
+                    <div className="bg-white p-2 rounded border border-blue-100">
+                      <span className="text-[10px] text-slate-500 block">固都税精算金 合計</span>
+                      <span className="font-mono font-bold text-slate-900">{formatCurrency(curFixedTaxTotal)}</span>
+                    </div>
+                    <div className="bg-white p-2 rounded border border-blue-200">
+                      <span className="text-[10px] text-blue-700 font-bold block">仕入本体 総合計</span>
+                      <span className="font-mono font-bold text-blue-700">
+                        {formatCurrency(curLandPrice + curBldgPrice + curFixedTaxTotal)}
+                      </span>
                     </div>
                   </div>
-                </div>
+                )}
 
-                {/* 手付金 & 決済日 */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
-                      手付金額 (円)
-                    </label>
-                    <input
-                      type="number"
-                      value={depositAmount}
-                      onChange={e =>
-                        setDepositAmount(e.target.value === '' ? '' : parseFloat(e.target.value))
-                      }
-                      placeholder="例: 10000000"
-                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-500 font-mono"
-                    />
-                    <p className="text-[10px] text-slate-500 mt-0.5 font-mono">
-                      {formatCurrency(Number(depositAmount) || 0)}
-                    </p>
-                  </div>
+                {purchases.map((purchase, pIdx) => {
+                  const pTaxLand = Number(purchase.fixedAssetTaxSettlementLand) || 0;
+                  const pTaxBldg = Number(purchase.fixedAssetTaxSettlementBuilding) || 0;
+                  const pTaxTotal = pTaxLand + pTaxBldg;
+                  const pSubtotal =
+                    (Number(purchase.landPurchasePrice) || 0) +
+                    (Number(purchase.buildingPurchasePrice) || 0) +
+                    pTaxTotal;
 
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
-                      手付金の決済日 (支払日)
-                    </label>
-                    <DateInput
-                      value={depositSettlementDate}
-                      onChange={setDepositSettlementDate}
-                      placeholder="例: 260410"
-                    />
-                    <p className="text-[10px] text-slate-400 mt-0.5">手付金のみ支払済の判定</p>
-                  </div>
+                  return (
+                    <div
+                      key={purchase.id || pIdx}
+                      className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden"
+                    >
+                      {/* Purchase Card Header */}
+                      <div className="px-3.5 py-2 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                          <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center">
+                            {pIdx + 1}
+                          </span>
+                          <span className="text-xs font-bold text-slate-900">
+                            仕入情報 #{pIdx + 1}
+                          </span>
+                          <div className="flex items-center space-x-1 ml-1">
+                            <input
+                              type="text"
+                              value={purchase.label || ''}
+                              onChange={e =>
+                                handleUpdatePurchaseField(pIdx, 'label', e.target.value)
+                              }
+                              placeholder="区分ラベル(任意: 土地分 / 建物分 / 北側隣地 等)"
+                              className="px-2 py-0.5 text-[11px] bg-white border border-slate-300 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-500 w-52"
+                            />
+                            <div className="hidden sm:flex items-center space-x-1">
+                              {['土地分', '建物分', '土地①', '土地②', '持分'].map(preset => (
+                                <button
+                                  key={preset}
+                                  type="button"
+                                  onClick={() => handleUpdatePurchaseField(pIdx, 'label', preset)}
+                                  className={`px-1.5 py-0.2 rounded text-[10px] border transition-colors cursor-pointer ${
+                                    purchase.label === preset
+                                      ? 'bg-blue-600 text-white border-blue-600 font-bold'
+                                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                                  }`}
+                                >
+                                  {preset}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
 
-                  <div>
-                    <label className="block text-[11px] font-bold text-emerald-800 mb-0.5 flex items-center space-x-1">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>本決済日 (残代金決済・引渡支払日)</span>
-                    </label>
-                    <DateInput
-                      value={settlementDate}
-                      onChange={setSettlementDate}
-                      placeholder="例: 260530"
-                    />
-                    <p className="text-[10px] text-slate-400 mt-0.5">決済日入力で仕入・棚卸に計上</p>
-                  </div>
-                </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="text-right">
+                            <span className="text-[10px] text-slate-500 mr-1.5">この仕入の小計:</span>
+                            <span className="text-xs font-bold text-blue-700 font-mono">
+                              {formatCurrency(pSubtotal)}
+                            </span>
+                          </div>
+                          {purchases.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePurchase(pIdx)}
+                              className="text-slate-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors cursor-pointer flex items-center space-x-0.5 text-[11px]"
+                              title="この仕入情報を削除"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>削除</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
 
-                {/* 備考メモ */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
-                    社内備考・特記事項
-                  </label>
-                  <textarea
-                    value={notes}
-                    onChange={e => setNotes(e.target.value)}
-                    placeholder="道路後退、越境、建築確認、用途地域などの特記事項"
-                    rows={2}
-                    className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
+                      {/* Purchase Card Body */}
+                      <div className="p-3.5 space-y-3">
+                        {/* 仕入先 */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
+                              仕入先 (売主名)
+                            </label>
+                            <input
+                              type="text"
+                              value={purchase.sellerName}
+                              onChange={e =>
+                                handleUpdatePurchaseField(pIdx, 'sellerName', e.target.value)
+                              }
+                              placeholder="例: 山田中 太郎"
+                              className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-500 font-semibold"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
+                              仕入先の住所
+                            </label>
+                            <input
+                              type="text"
+                              value={purchase.sellerAddress}
+                              onChange={e =>
+                                handleUpdatePurchaseField(pIdx, 'sellerAddress', e.target.value)
+                              }
+                              placeholder="例: 東京都世田谷区北沢2-10-5"
+                              className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                            />
+                          </div>
+                        </div>
+
+                        {/* 複数仕入時の個別面積（任意） */}
+                        {purchases.length > 1 && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 bg-slate-50/70 p-2.5 rounded border border-slate-200">
+                            <div>
+                              <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
+                                この仕入の対象土地面積 (㎡・任意)
+                              </label>
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={purchase.landArea !== undefined && purchase.landArea !== null ? purchase.landArea : ''}
+                                  onChange={e =>
+                                    handleUpdatePurchaseField(
+                                      pIdx,
+                                      'landArea',
+                                      e.target.value === '' ? undefined : parseFloat(e.target.value)
+                                    )
+                                  }
+                                  placeholder="例: 165.29"
+                                  className="w-full px-2 py-1 text-xs bg-white border border-slate-300 rounded font-mono pr-6"
+                                />
+                                <span className="absolute right-2 top-1 text-[10px] text-slate-400">㎡</span>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
+                                この仕入の対象建物面積 (㎡・任意)
+                              </label>
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={purchase.buildingArea !== undefined && purchase.buildingArea !== null ? purchase.buildingArea : ''}
+                                  onChange={e =>
+                                    handleUpdatePurchaseField(
+                                      pIdx,
+                                      'buildingArea',
+                                      e.target.value === '' ? undefined : parseFloat(e.target.value)
+                                    )
+                                  }
+                                  placeholder="例: 115.42"
+                                  className="w-full px-2 py-1 text-xs bg-white border border-slate-300 rounded font-mono pr-6"
+                                />
+                                <span className="absolute right-2 top-1 text-[10px] text-slate-400">㎡</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 契約日・土地仕入金額・建物仕入金額 */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
+                              契約日
+                            </label>
+                            <DateInput
+                              value={purchase.contractDate}
+                              onChange={val => handleUpdatePurchaseField(pIdx, 'contractDate', val)}
+                              placeholder="例: 260401 または 2026/04/01"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
+                              土地仕入金額 (円・非課税)
+                            </label>
+                            <input
+                              type="number"
+                              value={purchase.landPurchasePrice || ''}
+                              onChange={e =>
+                                handleUpdatePurchaseField(
+                                  pIdx,
+                                  'landPurchasePrice',
+                                  e.target.value === '' ? 0 : parseFloat(e.target.value)
+                                )
+                              }
+                              placeholder="例: 120000000"
+                              className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-500 font-mono"
+                            />
+                            <p className="text-[10px] text-slate-500 mt-0.5 font-mono">
+                              {formatCurrency(Number(purchase.landPurchasePrice) || 0)}
+                            </p>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
+                              建物仕入金額 (円・税込)
+                            </label>
+                            <input
+                              type="number"
+                              value={purchase.buildingPurchasePrice || ''}
+                              onChange={e =>
+                                handleUpdatePurchaseField(
+                                  pIdx,
+                                  'buildingPurchasePrice',
+                                  e.target.value === '' ? 0 : parseFloat(e.target.value)
+                                )
+                              }
+                              placeholder="例: 5500000"
+                              className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-500 font-mono"
+                            />
+                            <p className="text-[10px] text-slate-500 mt-0.5 font-mono">
+                              {formatCurrency(Number(purchase.buildingPurchasePrice) || 0)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* 固定資産税等精算金 (土地 / 建物 税込入力) */}
+                        <div className="bg-blue-50/40 p-3 rounded-lg border border-blue-100 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-blue-950 flex items-center space-x-1">
+                              <span>固定資産税等精算金 (支払・仕入原価算入)</span>
+                            </span>
+                            <span className="text-xs font-bold text-blue-700 font-mono">
+                              精算金合計: {formatCurrency(pTaxTotal)}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
+                                土地分 精算金 (円・非課税)
+                              </label>
+                              <input
+                                type="number"
+                                value={purchase.fixedAssetTaxSettlementLand || ''}
+                                onChange={e =>
+                                  handleUpdatePurchaseField(
+                                    pIdx,
+                                    'fixedAssetTaxSettlementLand',
+                                    e.target.value === '' ? 0 : parseFloat(e.target.value)
+                                  )
+                                }
+                                placeholder="例: 250000"
+                                className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-500 font-mono"
+                              />
+                              <p className="text-[10px] text-slate-500 mt-0.5 font-mono">
+                                {formatCurrency(pTaxLand)}
+                              </p>
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
+                                建物分 精算金 (円・税込)
+                              </label>
+                              <input
+                                type="number"
+                                value={purchase.fixedAssetTaxSettlementBuilding || ''}
+                                onChange={e =>
+                                  handleUpdatePurchaseField(
+                                    pIdx,
+                                    'fixedAssetTaxSettlementBuilding',
+                                    e.target.value === '' ? 0 : parseFloat(e.target.value)
+                                  )
+                                }
+                                placeholder="例: 110000"
+                                className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-500 font-mono"
+                              />
+                              <p className="text-[10px] text-slate-500 mt-0.5 font-mono">
+                                {formatCurrency(pTaxBldg)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 手付金 & 決済日 */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
+                              手付金額 (円)
+                            </label>
+                            <input
+                              type="number"
+                              value={purchase.depositAmount || ''}
+                              onChange={e =>
+                                handleUpdatePurchaseField(
+                                  pIdx,
+                                  'depositAmount',
+                                  e.target.value === '' ? 0 : parseFloat(e.target.value)
+                                )
+                              }
+                              placeholder="例: 10000000"
+                              className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-500 font-mono"
+                            />
+                            <p className="text-[10px] text-slate-500 mt-0.5 font-mono">
+                              {formatCurrency(Number(purchase.depositAmount) || 0)}
+                            </p>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
+                              手付金の決済日 (支払日)
+                            </label>
+                            <DateInput
+                              value={purchase.depositSettlementDate || ''}
+                              onChange={val =>
+                                handleUpdatePurchaseField(pIdx, 'depositSettlementDate', val)
+                              }
+                              placeholder="例: 260410"
+                            />
+                            <p className="text-[10px] text-slate-400 mt-0.5">手付金のみ支払済の判定</p>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-emerald-800 mb-0.5 flex items-center space-x-1">
+                              <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>本決済日 (残代金決済・引渡支払日)</span>
+                            </label>
+                            <DateInput
+                              value={purchase.settlementDate || ''}
+                              onChange={val =>
+                                handleUpdatePurchaseField(pIdx, 'settlementDate', val)
+                              }
+                              placeholder="例: 260530"
+                            />
+                            <p className="text-[10px] text-slate-400 mt-0.5">決済日入力で仕入・棚卸に計上</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* 下部の追加ボタン */}
+                <button
+                  type="button"
+                  onClick={handleAddPurchase}
+                  className="w-full py-2 px-3 rounded-lg border-2 border-dashed border-blue-300 bg-blue-50/40 hover:bg-blue-50 text-blue-700 text-xs font-bold transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>別の仕入情報を追加する（土地と建物が別売主・複数筆の合算など）</span>
+                </button>
               </div>
             </div>
           )}

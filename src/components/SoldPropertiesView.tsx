@@ -31,6 +31,8 @@ import {
   getPropertyTypeBadgeClass,
   isDateInFiscalYear,
   getPurchaseFixedAssetTax,
+  getPurchaseRecordFixedAssetTax,
+  getPropertyPurchases,
   getSaleFixedAssetTax,
   formatSellerDisplayName,
   isPropertySoldInPriorPeriod,
@@ -132,7 +134,14 @@ export const SoldPropertiesView: React.FC<SoldPropertiesViewProps> = ({
           const matchCode = (prop.code || '').toLowerCase().includes(q);
           const matchName = (prop.name || '').toLowerCase().includes(q);
           const matchLoc = (prop.location || '').toLowerCase().includes(q);
-          const matchSeller = (prop.sellerName || '').toLowerCase().includes(q);
+          const matchSeller =
+            (prop.sellerName || '').toLowerCase().includes(q) ||
+            (prop.purchases || []).some(
+              p =>
+                p.sellerName?.toLowerCase().includes(q) ||
+                p.sellerAddress?.toLowerCase().includes(q) ||
+                p.label?.toLowerCase().includes(q)
+            );
           const matchBuyer = item.buyerNamesDisplay.toLowerCase().includes(q);
           const matchIncidentalPayee = (prop.incidentalCosts || []).some(
             c =>
@@ -796,13 +805,13 @@ export const SoldPropertiesView: React.FC<SoldPropertiesViewProps> = ({
                                   <div>
                                     <span className="text-slate-400 block">土地仕入本体</span>
                                     <span className="font-mono font-medium text-slate-700">
-                                      {formatCurrency(prop.landPurchasePrice || 0)}
+                                      {formatCurrency(fin.settledPurchaseLandCost || prop.landPurchasePrice || 0)}
                                     </span>
                                   </div>
                                   <div>
                                     <span className="text-slate-400 block">建物仕入本体</span>
                                     <span className="font-mono font-medium text-slate-700">
-                                      {formatCurrency(prop.buildingPurchasePrice || 0)}
+                                      {formatCurrency(fin.settledPurchaseBuildingCost || prop.buildingPurchasePrice || 0)}
                                     </span>
                                   </div>
                                   <div>
@@ -818,6 +827,31 @@ export const SoldPropertiesView: React.FC<SoldPropertiesViewProps> = ({
                                     </span>
                                   </div>
                                 </div>
+                                {getPropertyPurchases(prop).length > 1 && (
+                                  <div className="pt-1.5 border-t border-slate-100 space-y-1">
+                                    <span className="text-[10px] font-bold text-slate-500 block">
+                                      仕入契約別内訳（{getPropertyPurchases(prop).length}件）
+                                    </span>
+                                    {getPropertyPurchases(prop).map((pRec, pIdx) => {
+                                      const recTax = getPurchaseRecordFixedAssetTax(pRec).total;
+                                      const recSub = (pRec.landPurchasePrice || 0) + (pRec.buildingPurchasePrice || 0) + recTax;
+                                      return (
+                                        <div
+                                          key={pRec.id || pIdx}
+                                          className="flex items-center justify-between text-[10px] bg-slate-50 px-2 py-1 rounded border border-slate-200"
+                                        >
+                                          <span className="text-slate-700 truncate">
+                                            #{pIdx + 1} {pRec.label ? `[${pRec.label}] ` : ''}{pRec.sellerName || '売主未設定'}
+                                            {pRec.purchaseSettlementDate ? ` (${pRec.purchaseSettlementDate})` : ''}
+                                          </span>
+                                          <span className="font-mono font-semibold text-slate-800 ml-2 shrink-0">
+                                            {formatCurrency(recSub)}
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
                                 {prop.initialInventoryCost ? (
                                   <div className="text-[10px] text-purple-700 bg-purple-50 p-1.5 rounded border border-purple-200">
                                     前期繰越期首棚卸高: {formatCurrency(prop.initialInventoryCost)} ({prop.initialInventoryNote || '前期より繰越'})

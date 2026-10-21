@@ -6,6 +6,7 @@ import {
   FiscalYear,
   AccountingMatchSummary,
   SaleRecord,
+  PurchaseRecord,
   IncidentalCost,
 } from '../types';
 
@@ -139,19 +140,95 @@ export function isDateBeforeFiscalYear(dateStr: string | undefined | null, fy: F
 }
 
 /**
- * 固定資産税等精算金の合計を取得 (土地分 + 建物分 + 建物消費税 または 合計値)
+ * 個別の仕入レコードの固定資産税等精算金を取得
  */
-export function getPurchaseFixedAssetTax(property: Property): { land: number; building: number; buildingTax: number; total: number } {
-  const land = property.fixedAssetTaxSettlementLand || 0;
-  const building = property.fixedAssetTaxSettlementBuilding || 0;
-  const buildingTax = property.fixedAssetTaxSettlementBuildingTax || 0;
-  const total = (land + building + buildingTax) > 0 ? (land + building + buildingTax) : (property.fixedAssetTaxSettlement || 0);
+export function getPurchaseRecordFixedAssetTax(
+  p: Pick<
+    PurchaseRecord,
+    | 'fixedAssetTaxSettlementLand'
+    | 'fixedAssetTaxSettlementBuilding'
+    | 'fixedAssetTaxSettlementBuildingTax'
+    | 'fixedAssetTaxSettlement'
+  >
+): { land: number; building: number; buildingTax: number; total: number } {
+  const land = p.fixedAssetTaxSettlementLand || 0;
+  const building = p.fixedAssetTaxSettlementBuilding || 0;
+  const buildingTax = p.fixedAssetTaxSettlementBuildingTax || 0;
+  const total =
+    land + building + buildingTax > 0
+      ? land + building + buildingTax
+      : p.fixedAssetTaxSettlement || 0;
   return {
-    land: land > 0 ? land : (building === 0 && property.fixedAssetTaxSettlement ? property.fixedAssetTaxSettlement : 0),
+    land:
+      land > 0
+        ? land
+        : building === 0 && p.fixedAssetTaxSettlement
+        ? p.fixedAssetTaxSettlement
+        : 0,
     building,
     buildingTax,
     total,
   };
+}
+
+/**
+ * 物件に紐づく仕入レコード一覧を取得（旧データ・単一仕入データとの完全互換）
+ */
+export function getPropertyPurchases(property: Property): PurchaseRecord[] {
+  if (property.purchases && property.purchases.length > 0) {
+    return property.purchases;
+  }
+  const bldgGross =
+    (property.buildingPurchasePrice || 0) + (property.buildingPurchaseTax || 0);
+  const bldgTaxGross =
+    (property.fixedAssetTaxSettlementBuilding || 0) +
+    (property.fixedAssetTaxSettlementBuildingTax || 0);
+  const landTax =
+    property.fixedAssetTaxSettlementLand !== undefined
+      ? property.fixedAssetTaxSettlementLand || 0
+      : !property.fixedAssetTaxSettlementBuilding
+      ? property.fixedAssetTaxSettlement || 0
+      : 0;
+  return [
+    {
+      id: `${property.id || 'prop'}-purchase-1`,
+      propertyId: property.id,
+      sellerName: property.sellerName || '',
+      sellerAddress: property.sellerAddress || '',
+      purchaseType: property.propertyType,
+      landArea: property.landArea || undefined,
+      buildingArea: property.buildingArea || undefined,
+      contractDate: property.contractDate || '',
+      landPurchasePrice: property.landPurchasePrice || 0,
+      buildingPurchasePrice: bldgGross,
+      buildingPurchaseTax: 0,
+      settlementDate: property.settlementDate,
+      depositAmount: property.depositAmount || 0,
+      depositSettlementDate: property.depositSettlementDate,
+      fixedAssetTaxSettlementLand: landTax,
+      fixedAssetTaxSettlementBuilding: bldgTaxGross,
+      fixedAssetTaxSettlementBuildingTax: 0,
+      fixedAssetTaxSettlement: landTax + bldgTaxGross,
+    },
+  ];
+}
+
+/**
+ * 固定資産税等精算金の合計を取得 (全仕入レコードの合算)
+ */
+export function getPurchaseFixedAssetTax(property: Property): { land: number; building: number; buildingTax: number; total: number } {
+  const purchases = getPropertyPurchases(property);
+  return purchases.reduce(
+    (acc, p) => {
+      const t = getPurchaseRecordFixedAssetTax(p);
+      acc.land += t.land;
+      acc.building += t.building;
+      acc.buildingTax += t.buildingTax;
+      acc.total += t.total;
+      return acc;
+    },
+    { land: 0, building: 0, buildingTax: 0, total: 0 }
+  );
 }
 
 export function getSaleFixedAssetTax(sale: SaleRecord): { land: number; building: number; buildingTax: number; total: number } {
@@ -178,15 +255,25 @@ export function determinePropertyStatus(property: Property): { status: PropertyS
     };
   }
 
-  const hasSettledPurchase = !!property.settlementDate;
-  const hasDepositPaid = !!property.depositSettlementDate && !property.settlementDate;
+  const purchases = getPropertyPurchases(property);
+  const hasSettledPurchase = purchases.some(p => !!p.settlementDate) || !!property.settlementDate;
+  const hasDepositPaid =
+    !hasSettledPurchase &&
+    (purchases.some(p => !!p.depositSettlementDate) || !!property.depositSettlementDate);
   const settledSales = (property.sales || []).filter(s => !!s.settlementDate);
   const purchaseTax = getPurchaseFixedAssetTax(property);
 
+  const landPriceSum = purchases.reduce((sum, p) => sum + (p.landPurchasePrice || 0), 0);
+  const bldgPriceSum = purchases.reduce(
+    (sum, p) => sum + (p.buildingPurchasePrice || 0) + (p.buildingPurchaseTax || 0),
+    0
+  );
+
   // 総原価
-  const baseCost = (property.initialInventoryCost || 0) +
-    (property.landPurchasePrice || 0) +
-    (property.buildingPurchasePrice || 0) +
+  const baseCost =
+    (property.initialInventoryCost || 0) +
+    landPriceSum +
+    bldgPriceSum +
     purchaseTax.total +
     (property.incidentalCosts || []).reduce((acc, c) => acc + (c.amount || 0), 0);
 
@@ -365,13 +452,17 @@ export function calculatePropertyFinancials(property: Property, fy: FiscalYear):
   const landAreaTsubo = (property.landArea || 0) * SQM_TO_TSUBO;
   const buildingAreaTsubo = (property.buildingArea || 0) * SQM_TO_TSUBO;
 
+  const purchases = getPropertyPurchases(property);
   const purchaseTax = getPurchaseFixedAssetTax(property);
 
+  const landPurchaseTotal = purchases.reduce((sum, p) => sum + (p.landPurchasePrice || 0), 0);
+  const buildingPurchaseTotal = purchases.reduce(
+    (sum, p) => sum + (p.buildingPurchasePrice || 0) + (p.buildingPurchaseTax || 0),
+    0
+  );
+
   // 仕入基本合計 (土地 + 建物 + 固定資産税精算金)
-  const purchaseBaseTotal =
-    (property.landPurchasePrice || 0) +
-    (property.buildingPurchasePrice || 0) +
-    purchaseTax.total;
+  const purchaseBaseTotal = landPurchaseTotal + buildingPurchaseTotal + purchaseTax.total;
 
   // 付随費用累計
   const incidentalCostsTotal = (property.incidentalCosts || []).reduce(
@@ -410,13 +501,21 @@ export function calculatePropertyFinancials(property: Property, fy: FiscalYear):
   const grossProfitMargin = settledSalesAmount > 0 ? (grossProfit / settledSalesAmount) * 100 : 0;
 
   // --- 当期判定 (事業年度 fy に基づく計算) ---
-  // 1. 当期仕入 (仕入本体の決済日が当期内にある場合)
+  // 1. 当期仕入 (各仕入レコードの決済日が当期内にある場合)
   let currentPeriodPurchase = 0;
   let isPurchasedInCurrentPeriod = false;
-  if (isDateInFiscalYear(property.settlementDate, fy)) {
-    currentPeriodPurchase += purchaseBaseTotal;
-    isPurchasedInCurrentPeriod = true;
-  }
+  purchases.forEach(p => {
+    if (isDateInFiscalYear(p.settlementDate, fy)) {
+      const pTax = getPurchaseRecordFixedAssetTax(p);
+      const pBase =
+        (p.landPurchasePrice || 0) +
+        (p.buildingPurchasePrice || 0) +
+        (p.buildingPurchaseTax || 0) +
+        pTax.total;
+      currentPeriodPurchase += pBase;
+      isPurchasedInCurrentPeriod = true;
+    }
+  });
 
   // 2. 当期付随費用 (支払日が当期内にある費用)
   (property.incidentalCosts || []).forEach(cost => {
@@ -499,14 +598,25 @@ export function calculateAccountingSummary(properties: Property[], fy: FiscalYea
   let endingInventoryTotal = 0;
 
   properties.forEach(property => {
-    const pTax = getPurchaseFixedAssetTax(property);
+    const purchases = getPropertyPurchases(property);
 
     // 1. 期首棚卸高の集計 (前期からの繰越残高)
     if (property.initialInventoryCost && property.initialInventoryCost > 0) {
       beginningInventoryTotal += property.initialInventoryCost;
     } else {
       // もし前期以前に決済され、前期末時点で売却されていなかった場合の仕入原価
-      if (isDateBeforeFiscalYear(property.settlementDate, fy)) {
+      const prevPurchases = purchases.filter(p => isDateBeforeFiscalYear(p.settlementDate, fy));
+      if (prevPurchases.length > 0) {
+        const prevBase = prevPurchases.reduce((sum, p) => {
+          const pTax = getPurchaseRecordFixedAssetTax(p);
+          return (
+            sum +
+            (p.landPurchasePrice || 0) +
+            (p.buildingPurchasePrice || 0) +
+            (p.buildingPurchaseTax || 0) +
+            pTax.total
+          );
+        }, 0);
         // 前期以前の付随費用
         const prevCosts = (property.incidentalCosts || [])
           .filter(c => isDateBeforeFiscalYear(c.paymentDate, fy))
@@ -515,8 +625,7 @@ export function calculateAccountingSummary(properties: Property[], fy: FiscalYea
         const prevCOGS = (property.sales || [])
           .filter(s => isDateBeforeFiscalYear(s.settlementDate, fy))
           .reduce((sum, s) => sum + (s.costOfGoodsSold || 0), 0);
-        
-        const prevBase = (property.landPurchasePrice || 0) + (property.buildingPurchasePrice || 0) + pTax.total;
+
         const carriedBalance = Math.max(0, prevBase + prevCosts - prevCOGS);
         if (carriedBalance > 0 && !property.initialInventoryCost) {
           beginningInventoryTotal += carriedBalance;
@@ -524,14 +633,17 @@ export function calculateAccountingSummary(properties: Property[], fy: FiscalYea
       }
     }
 
-    // 2. 当期仕入科目 (決済日が当期内)
-    if (isDateInFiscalYear(property.settlementDate, fy)) {
-      purchaseLandTotal += property.landPurchasePrice || 0;
-      purchaseBuildingTotal += property.buildingPurchasePrice || 0;
-      purchaseFixedAssetTaxLandTotal += pTax.land;
-      purchaseFixedAssetTaxBuildingTotal += pTax.building + pTax.buildingTax;
-      purchaseFixedAssetTaxTotal += pTax.total;
-    }
+    // 2. 当期仕入科目 (各仕入レコードの決済日が当期内)
+    purchases.forEach(p => {
+      if (isDateInFiscalYear(p.settlementDate, fy)) {
+        const pTax = getPurchaseRecordFixedAssetTax(p);
+        purchaseLandTotal += p.landPurchasePrice || 0;
+        purchaseBuildingTotal += (p.buildingPurchasePrice || 0) + (p.buildingPurchaseTax || 0);
+        purchaseFixedAssetTaxLandTotal += pTax.land;
+        purchaseFixedAssetTaxBuildingTotal += pTax.building + pTax.buildingTax;
+        purchaseFixedAssetTaxTotal += pTax.total;
+      }
+    });
 
     // 3. 当期付随費用 (支払日が当期内)
     (property.incidentalCosts || []).forEach(cost => {
