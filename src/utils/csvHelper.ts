@@ -1,4 +1,4 @@
-import { Property, PropertyType, LandCategory, IncidentalCost, IncidentalCostType } from '../types';
+import { Property, PropertyType, LandCategory, IncidentalCost, IncidentalCostType, SaleRecord, SaleCategory } from '../types';
 import { generateNextPropertyCode } from './codeGenerator';
 
 /**
@@ -36,6 +36,31 @@ export const INCIDENTAL_COST_CSV_TEMPLATE_HEADERS = [
   '相手先_支払先',
   '支払日',
   '金額_税込',
+  '備考メモ',
+];
+
+/**
+ * 売上情報CSVテンプレートの定義
+ */
+export const SALE_CSV_TEMPLATE_HEADERS = [
+  '管理コード',
+  '物件所在地',
+  '売却形態',
+  '区画・号地名',
+  '買主名_売上先',
+  '買主住所',
+  '売上契約日',
+  '売上決済日',
+  '手付金額',
+  '手付金受領日',
+  '売却土地面積_㎡',
+  '売却建物面積_㎡',
+  '土地売上金額_非課税',
+  '建物売上金額_税込',
+  '固定資産税精算金_土地分',
+  '固定資産税精算金_建物分_税込',
+  '計上売上原価',
+  '原価計算メモ',
   '備考メモ',
 ];
 
@@ -788,14 +813,554 @@ export function applyIncidentalCostsToProperties(
   };
 }
 
+// ============================================================================
+// 3. 売上情報 CSV一括取込ロジック
+// ============================================================================
+
 /**
- * CSVテキストの自動種別判定 (物件 or 付随費用)
+ * 売上情報CSVのサンプルテンプレートを生成する
  */
-export function detectCsvType(csvText: string): 'properties' | 'incidental_costs' {
+export function generateSaleCsvTemplate(existingProperties?: Property[]): string {
+  const firstProp = existingProperties && existingProperties.length > 0 ? existingProperties[0] : null;
+  const secondProp = existingProperties && existingProperties.length > 1 ? existingProperties[1] : null;
+
+  const sampleCode1 = firstProp ? firstProp.code : '25001';
+  const sampleLoc1 = firstProp ? firstProp.location : '東京都世田谷区成城6-12-8';
+  const sampleCode2 = secondProp ? secondProp.code : sampleCode1;
+  const sampleLoc2 = secondProp ? secondProp.location : sampleLoc1;
+
+  const sampleRows = [
+    [
+      sampleCode1,
+      sampleLoc1,
+      '全部売却',
+      '',
+      '鈴木 一郎',
+      '東京都世田谷区砧2-3-4',
+      '2025-10-15',
+      '2025-11-28',
+      '3000000',
+      '2025-10-15',
+      '120.50',
+      '95.20',
+      '35000000',
+      '18000000',
+      '42000',
+      '28000',
+      '', // 計上売上原価 (空欄の場合は物件の総仕入原価または面積按分から自動計算)
+      '',
+      '一般個人向け一括売却・引渡完了',
+    ],
+    [
+      sampleCode2,
+      sampleLoc2,
+      '一部売却',
+      'A区画 (北側)',
+      '株式会社都市住宅販売',
+      '東京都新宿区西新宿1-10-2',
+      '2025-11-10',
+      '2025-12-20',
+      '2000000',
+      '2025-11-10',
+      '100.00',
+      '0',
+      '24800000',
+      '0',
+      '31000',
+      '0',
+      '18500000', // 明示的に売上原価を指定する例
+      '面積按分により算出',
+      '2区画分譲のうちA区画引渡',
+    ],
+  ];
+
+  const lines = [
+    SALE_CSV_TEMPLATE_HEADERS.join(','),
+    ...sampleRows.map(row =>
+      row
+        .map(cell => {
+          if (cell.includes(',') || cell.includes('"') || cell.includes('\n')) {
+            return `"${cell.replace(/"/g, '""')}"`;
+          }
+          return cell;
+        })
+        .join(',')
+    ),
+  ];
+
+  return '\uFEFF' + lines.join('\r\n');
+}
+
+/**
+ * 売上情報CSVテンプレートをダウンロードする
+ */
+export function downloadSaleCsvTemplate(existingProperties?: Property[]): void {
+  const csvContent = generateSaleCsvTemplate(existingProperties);
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute(
+    'download',
+    `売上データ取込用テンプレート_${new Date().toISOString().slice(0, 10)}.csv`
+  );
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * 売上CSVパース結果の1行データ
+ */
+export interface ParsedCsvSaleRow {
+  rowIndex: number;
+  targetCode: string;
+  targetLocation: string;
+  matchedProperty?: Property;
+  saleCategory: SaleCategory;
+  partialSaleName: string;
+  buyerName: string;
+  buyerAddress: string;
+  contractDate: string;
+  settlementDate: string;
+  depositAmount: number;
+  depositSettlementDate: string;
+  soldLandArea: number;
+  soldBuildingArea: number;
+  landPrice: number;
+  buildingPrice: number;
+  fixedAssetTaxSettlementLand: number;
+  fixedAssetTaxSettlementBuilding: number;
+  fixedAssetTaxSettlement: number;
+  costOfGoodsSold: number | null; // nullの場合は物件原価から自動計算
+  costCalculationNote: string;
+  memo: string;
+  errors: string[];
+  warnings: string[];
+}
+
+/**
+ * 売却形態文字列の正規化
+ */
+function normalizeSaleCategory(raw: string, partialName: string): SaleCategory {
+  const s = (raw || '').trim().toLowerCase();
+  if (
+    s.includes('一部') ||
+    s.includes('分筆') ||
+    s.includes('分譲') ||
+    s.includes('区画') ||
+    s === 'partial'
+  ) {
+    return 'partial';
+  }
+  if (s.includes('全') || s.includes('一括') || s === 'full') {
+    return 'full';
+  }
+  // 明示指定がない場合、区画名が入っていれば一部売却と推定
+  if (partialName && partialName.trim().length > 0) {
+    return 'partial';
+  }
+  return 'full';
+}
+
+/**
+ * 物件の総仕入原価（初期繰越 + 土地・建物仕入 + 固都税精算金 + 付随費用累計）を算出
+ */
+function computePropertyTotalAcquisitionCost(prop: Property): number {
+  const initialCost = prop.isCarriedOver ? Number(prop.initialInventoryCost) || 0 : 0;
+  const landCost = Number(prop.landPurchasePrice) || 0;
+  const bldgCost = Number(prop.buildingPurchasePrice) || 0;
+  const taxLand = Number(prop.fixedAssetTaxSettlementLand) || 0;
+  const taxBldg = Number(prop.fixedAssetTaxSettlementBuilding) || 0;
+  const taxTotal =
+    taxLand + taxBldg > 0 ? taxLand + taxBldg : Number(prop.fixedAssetTaxSettlement) || 0;
+  const incidentalTotal = (prop.incidentalCosts || []).reduce(
+    (acc, c) => acc + (Number(c.amount) || 0),
+    0
+  );
+  return initialCost + landCost + bldgCost + taxTotal + incidentalTotal;
+}
+
+/**
+ * 売上情報CSVテキストを解析し、既存物件との紐付け・バリデーションを行う
+ */
+export function parseSalesCsv(
+  csvText: string,
+  existingProperties: Property[]
+): {
+  headers: string[];
+  rows: ParsedCsvSaleRow[];
+  validRows: ParsedCsvSaleRow[];
+  hasHeaderRow: boolean;
+} {
+  const rawRows = parseCsvRows(csvText);
+  if (rawRows.length === 0) {
+    return { headers: [], rows: [], validRows: [], hasHeaderRow: false };
+  }
+
+  const firstRow = rawRows[0];
+  const headerKeywords = [
+    '管理コード',
+    'コード',
+    '所在地',
+    '買主',
+    '売上先',
+    '売却形態',
+    '契約日',
+    '土地売上',
+    '建物売上',
+  ];
+  const hasHeaderRow = firstRow.some(cell =>
+    headerKeywords.some(kw => cell.includes(kw))
+  );
+
+  const headers = hasHeaderRow ? firstRow : SALE_CSV_TEMPLATE_HEADERS;
+  const dataRows = hasHeaderRow ? rawRows.slice(1) : rawRows;
+
+  const findColIndex = (patterns: string[], fallbackIndex: number): number => {
+    if (!hasHeaderRow) return fallbackIndex;
+    const idx = headers.findIndex(h => {
+      const cleanH = h.replace(/[\s_（）()]/g, '').toLowerCase();
+      return patterns.some(p => cleanH.includes(p.toLowerCase()));
+    });
+    return idx >= 0 ? idx : fallbackIndex;
+  };
+
+  const colMap = {
+    code: findColIndex(['管理コード', '管理番号', '物件コード', 'コード', 'code'], 0),
+    location: findColIndex(['物件所在地', '所在地', '住所', '地番', '物件名', 'location'], 1),
+    saleCategory: findColIndex(['売却形態', '売却区分', '形態', 'category'], 2),
+    partialSaleName: findColIndex(['区画', '号地', '区画名', '号地名', 'partial'], 3),
+    buyerName: findColIndex(['買主名', '買主', '売上先', '顧客名', 'buyer'], 4),
+    buyerAddress: findColIndex(['買主住所', '売上先住所', '顧客住所'], 5),
+    contractDate: findColIndex(['売上契約日', '売却契約日', '契約日', 'contract'], 6),
+    settlementDate: findColIndex(['売上決済日', '売却決済日', '決済日', '引渡日', 'settlement'], 7),
+    depositAmount: findColIndex(['手付金額', '手付金', 'deposit'], 8),
+    depositSettlementDate: findColIndex(['手付金受領日', '手付金決済日', '手付受領日', '手付日'], 9),
+    soldLandArea: findColIndex(['売却土地面積', '土地面積', '売上土地面積'], 10),
+    soldBuildingArea: findColIndex(['売却建物面積', '建物面積', '売上建物面積'], 11),
+    landPrice: findColIndex(['土地売上金額', '土地売却金額', '土地売上', '土地価格', 'landprice'], 12),
+    buildingPrice: findColIndex(['建物売上金額', '建物売却金額', '建物売上', '建物価格', 'buildingprice'], 13),
+    fixedTaxLand: findColIndex(['固定資産税精算金土地', '固都税精算金土地', '精算金土地', '固都税土地'], 14),
+    fixedTaxBldg: findColIndex(['固定資産税精算金建物', '固都税精算金建物', '精算金建物', '固都税建物'], 15),
+    costOfGoodsSold: findColIndex(['計上売上原価', '売上原価', '按分原価', '原価', 'cogs'], 16),
+    costCalculationNote: findColIndex(['原価計算メモ', '計算根拠', '按分メモ', '原価メモ'], 17),
+    memo: findColIndex(['備考メモ', '備考', 'メモ', '摘要', 'memo'], 18),
+  };
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const parsedRows: ParsedCsvSaleRow[] = [];
+
+  dataRows.forEach((cells, idx) => {
+    const getCell = (colIdx: number): string =>
+      colIdx >= 0 && colIdx < cells.length ? cells[colIdx].trim() : '';
+
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    const rawCode = getCell(colMap.code);
+    const rawLocation = getCell(colMap.location);
+    const rawCategory = getCell(colMap.saleCategory);
+    const partialSaleName = getCell(colMap.partialSaleName);
+    const buyerName = getCell(colMap.buyerName);
+    const buyerAddress = getCell(colMap.buyerAddress);
+    const rawContractDate = getCell(colMap.contractDate);
+    const rawSettlementDate = getCell(colMap.settlementDate);
+    const rawDepositAmount = getCell(colMap.depositAmount);
+    const rawDepositDate = getCell(colMap.depositSettlementDate);
+    const rawSoldLandArea = getCell(colMap.soldLandArea);
+    const rawSoldBldgArea = getCell(colMap.soldBuildingArea);
+    const rawLandPrice = getCell(colMap.landPrice);
+    const rawBldgPrice = getCell(colMap.buildingPrice);
+    const rawTaxLand = getCell(colMap.fixedTaxLand);
+    const rawTaxBldg = getCell(colMap.fixedTaxBldg);
+    const rawCOGS = getCell(colMap.costOfGoodsSold);
+    const costCalculationNote = getCell(colMap.costCalculationNote);
+    const memo = getCell(colMap.memo);
+
+    // 既存物件とのマッチング (1: 管理コード一致, 2: 所在地一致または部分一致)
+    let matchedProperty: Property | undefined;
+    if (rawCode) {
+      matchedProperty = existingProperties.find(
+        p => p.code.trim().toLowerCase() === rawCode.toLowerCase()
+      );
+    }
+    if (!matchedProperty && rawLocation) {
+      matchedProperty = existingProperties.find(
+        p => p.location.trim() === rawLocation.trim()
+      );
+      if (!matchedProperty) {
+        matchedProperty = existingProperties.find(
+          p =>
+            p.location.includes(rawLocation.trim()) ||
+            rawLocation.trim().includes(p.location)
+        );
+      }
+    }
+
+    if (!matchedProperty) {
+      if (!rawCode && !rawLocation) {
+        errors.push('紐付け先の「管理コード」または「物件所在地」が入力されていません');
+      } else {
+        errors.push(
+          `該当する物件が見つかりません (${rawCode ? `コード:${rawCode}` : ''}${
+            rawCode && rawLocation ? ' / ' : ''
+          }${rawLocation ? `所在地:${rawLocation}` : ''})`
+        );
+      }
+    }
+
+    const saleCategory = normalizeSaleCategory(rawCategory, partialSaleName);
+
+    let contractDate = normalizeDate(rawContractDate);
+    if (!contractDate) {
+      contractDate = todayStr;
+      warnings.push(`契約日が未入力または形式不正のため本日(${todayStr})を設定しました`);
+    }
+
+    const settlementDate = normalizeDate(rawSettlementDate);
+    if (rawSettlementDate && !settlementDate) {
+      warnings.push(`決済日「${rawSettlementDate}」の形式が不正なため未決済として扱います`);
+    }
+
+    const depositSettlementDate = normalizeDate(rawDepositDate);
+
+    const landPrice = Math.round(parseNumber(rawLandPrice));
+    const buildingPrice = Math.round(parseNumber(rawBldgPrice));
+    const fixedAssetTaxSettlementLand = Math.round(parseNumber(rawTaxLand));
+    const fixedAssetTaxSettlementBuilding = Math.round(parseNumber(rawTaxBldg));
+    const fixedAssetTaxSettlement =
+      fixedAssetTaxSettlementLand + fixedAssetTaxSettlementBuilding;
+
+    if (landPrice <= 0 && buildingPrice <= 0) {
+      warnings.push('土地売上金額と建物売上金額がともに0円です');
+    }
+
+    if (!buyerName) {
+      warnings.push('買主名（売上先）が未入力です');
+    }
+
+    const soldLandArea = parseNumber(rawSoldLandArea);
+    const soldBuildingArea = parseNumber(rawSoldBldgArea);
+    const depositAmount = Math.round(parseNumber(rawDepositAmount));
+
+    // 計上売上原価: 空欄の場合は null としておき、適用時に自動計算またはプレビュー用に算出
+    const hasExplicitCOGS = rawCOGS !== '';
+    let costOfGoodsSold: number | null = hasExplicitCOGS
+      ? Math.round(parseNumber(rawCOGS))
+      : null;
+
+    let resolvedNote = costCalculationNote;
+
+    if (costOfGoodsSold === null && matchedProperty) {
+      const totalAcq = computePropertyTotalAcquisitionCost(matchedProperty);
+      const existingCOGS = (matchedProperty.sales || []).reduce(
+        (acc, s) => acc + (Number(s.costOfGoodsSold) || 0),
+        0
+      );
+      const remainingAcq = Math.max(0, totalAcq - existingCOGS);
+
+      if (saleCategory === 'full') {
+        costOfGoodsSold = remainingAcq;
+        if (!resolvedNote) {
+          resolvedNote = `【全部売却(CSV取込)】未計上の仕入原価残額 ¥${remainingAcq.toLocaleString()} を自動計上`;
+        }
+      } else if (
+        saleCategory === 'partial' &&
+        soldLandArea > 0 &&
+        (matchedProperty.landArea || 0) > 0
+      ) {
+        const ratio = soldLandArea / matchedProperty.landArea;
+        costOfGoodsSold = Math.round(totalAcq * ratio);
+        if (!resolvedNote) {
+          resolvedNote = `【面積按分(CSV取込)】総仕入原価 ¥${totalAcq.toLocaleString()} × (${soldLandArea}㎡ / ${matchedProperty.landArea}㎡) で自動算出`;
+        }
+      } else {
+        costOfGoodsSold = 0;
+        warnings.push('一部売却で売上原価・売却面積が未指定のため売上原価を0円としました');
+      }
+    }
+
+    parsedRows.push({
+      rowIndex: hasHeaderRow ? idx + 2 : idx + 1,
+      targetCode: rawCode || (matchedProperty?.code ?? ''),
+      targetLocation: rawLocation || (matchedProperty?.location ?? ''),
+      matchedProperty,
+      saleCategory,
+      partialSaleName,
+      buyerName: buyerName || '未設定',
+      buyerAddress,
+      contractDate,
+      settlementDate,
+      depositAmount,
+      depositSettlementDate,
+      soldLandArea,
+      soldBuildingArea,
+      landPrice,
+      buildingPrice,
+      fixedAssetTaxSettlementLand,
+      fixedAssetTaxSettlementBuilding,
+      fixedAssetTaxSettlement,
+      costOfGoodsSold,
+      costCalculationNote: resolvedNote,
+      memo,
+      errors,
+      warnings,
+    });
+  });
+
+  const validRows = parsedRows.filter(
+    r => r.errors.length === 0 && !!r.matchedProperty
+  );
+
+  return {
+    headers,
+    rows: parsedRows,
+    validRows,
+    hasHeaderRow,
+  };
+}
+
+/**
+ * パース済み売上データを既存物件データに適用する
+ */
+export function applySalesToProperties(
+  existingProperties: Property[],
+  validSaleRows: ParsedCsvSaleRow[],
+  mode: 'append' | 'replace'
+): {
+  updatedProperties: Property[];
+  appliedCount: number;
+  affectedPropertiesCount: number;
+} {
+  const salesByPropId: Record<string, ParsedCsvSaleRow[]> = {};
+
+  validSaleRows.forEach(row => {
+    if (!row.matchedProperty) return;
+    const propId = row.matchedProperty.id;
+    if (!salesByPropId[propId]) {
+      salesByPropId[propId] = [];
+    }
+    salesByPropId[propId].push(row);
+  });
+
+  const affectedPropIds = new Set(Object.keys(salesByPropId));
+
+  const updatedProperties = existingProperties.map(prop => {
+    const propSaleRows = salesByPropId[prop.id];
+    if (!propSaleRows || propSaleRows.length === 0) {
+      return prop;
+    }
+
+    const baseSales: SaleRecord[] = mode === 'replace' ? [] : [...(prop.sales || [])];
+    const totalAcq = computePropertyTotalAcquisitionCost(prop);
+
+    propSaleRows.forEach((row, idx) => {
+      const currentCOGSTotal = baseSales.reduce(
+        (acc, s) => acc + (Number(s.costOfGoodsSold) || 0),
+        0
+      );
+      const remainingAcq = Math.max(0, totalAcq - currentCOGSTotal);
+
+      const currentSoldLandTotal = baseSales.reduce(
+        (acc, s) => acc + (Number(s.soldLandArea) || 0),
+        0
+      );
+      const remainingLandArea = Math.max(0, (Number(prop.landArea) || 0) - currentSoldLandTotal);
+
+      let finalCOGS = row.costOfGoodsSold ?? 0;
+      if (row.saleCategory === 'full' && (row.costOfGoodsSold === null || mode === 'replace')) {
+        // 全部売却で自動算出だった場合は残余原価を正確に充当
+        finalCOGS = row.costOfGoodsSold !== null ? row.costOfGoodsSold : remainingAcq;
+      }
+
+      const finalSoldLandArea =
+        row.soldLandArea > 0
+          ? row.soldLandArea
+          : row.saleCategory === 'full' && remainingLandArea > 0
+          ? Math.round(remainingLandArea * 100) / 100
+          : 0;
+
+      const finalSoldBldgArea =
+        row.soldBuildingArea > 0
+          ? row.soldBuildingArea
+          : row.saleCategory === 'full' && (prop.buildingArea || 0) > 0
+          ? prop.buildingArea || 0
+          : 0;
+
+      const saleType: PropertyType =
+        row.landPrice > 0 && row.buildingPrice > 0
+          ? 'land_and_building'
+          : row.buildingPrice > 0
+          ? 'building'
+          : prop.propertyType || 'land';
+
+      const saleRecord: SaleRecord = {
+        id: `sale-csv-${Date.now()}-${idx}`,
+        propertyId: prop.id,
+        buyerName: row.buyerName || '未設定',
+        buyerAddress: row.buyerAddress || '',
+        saleType,
+        saleCategory: row.saleCategory,
+        partialSaleName: row.partialSaleName || undefined,
+        soldLandArea: finalSoldLandArea,
+        soldBuildingArea: finalSoldBldgArea,
+        contractDate: row.contractDate,
+        landPrice: row.landPrice,
+        buildingPrice: row.buildingPrice,
+        buildingTax: 0,
+        settlementDate: row.settlementDate || undefined,
+        depositAmount: row.depositAmount || 0,
+        depositSettlementDate: row.depositSettlementDate || undefined,
+        fixedAssetTaxSettlementLand: row.fixedAssetTaxSettlementLand,
+        fixedAssetTaxSettlementBuilding: row.fixedAssetTaxSettlementBuilding,
+        fixedAssetTaxSettlementBuildingTax: 0,
+        fixedAssetTaxSettlement: row.fixedAssetTaxSettlement,
+        costOfGoodsSold: finalCOGS,
+        costCalculationNote: row.costCalculationNote || undefined,
+        memo: row.memo || undefined,
+      };
+
+      baseSales.push(saleRecord);
+    });
+
+    return {
+      ...prop,
+      sales: baseSales,
+      updatedAt: new Date().toISOString(),
+    };
+  });
+
+  return {
+    updatedProperties,
+    appliedCount: validSaleRows.length,
+    affectedPropertiesCount: affectedPropIds.size,
+  };
+}
+
+/**
+ * CSVテキストの自動種別判定 (物件 or 付随費用 or 売上)
+ */
+export function detectCsvType(
+  csvText: string
+): 'properties' | 'incidental_costs' | 'sales' {
   const rawRows = parseCsvRows(csvText);
   if (rawRows.length === 0) return 'properties';
 
   const firstRowStr = rawRows[0].join(',').toLowerCase();
+  if (
+    firstRowStr.includes('買主') ||
+    firstRowStr.includes('売上先') ||
+    firstRowStr.includes('売却形態') ||
+    firstRowStr.includes('土地売上') ||
+    firstRowStr.includes('建物売上') ||
+    firstRowStr.includes('売却土地') ||
+    firstRowStr.includes('計上売上原価')
+  ) {
+    return 'sales';
+  }
+
   if (
     firstRowStr.includes('費用区分') ||
     firstRowStr.includes('費用科目') ||
@@ -809,3 +1374,4 @@ export function detectCsvType(csvText: string): 'properties' | 'incidental_costs
 
   return 'properties';
 }
+

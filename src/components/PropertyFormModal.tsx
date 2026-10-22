@@ -31,6 +31,7 @@ import {
 } from '../utils/calculations';
 import { generateNextPropertyCode } from '../utils/codeGenerator';
 import { DateInput } from './DateInput';
+import { ResizableModal } from './ResizableModal';
 
 interface PropertyFormModalProps {
   isOpen: boolean;
@@ -735,36 +736,45 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3">
-      <div className="bg-white rounded-lg shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        {/* Modal Header */}
-        <div className="px-4 py-3 bg-[#001529] text-white flex items-center justify-between">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-300 flex items-center justify-center font-bold border border-blue-400/30">
-              <Building className="w-4 h-4" />
+    <ResizableModal
+      defaultWidth={896}
+      minWidth={520}
+      minHeight={420}
+      storageKey="property_form_modal"
+    >
+      {({ renderHeaderControls }) => (
+        <>
+          {/* Modal Header */}
+          <div className="px-4 py-3 bg-[#001529] text-white flex items-center justify-between">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-300 flex items-center justify-center font-bold border border-blue-400/30">
+                <Building className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold tracking-tight text-white flex items-center space-x-2">
+                  <span>{editingProperty ? `物件情報の編集 [${code}]` : '新規物件・仕入契約の登録'}</span>
+                  {location && (
+                    <span className="text-xs font-normal text-slate-300 truncate max-w-xs">
+                      {location}
+                    </span>
+                  )}
+                </h2>
+                <p className="text-[11px] text-slate-300 font-medium">
+                  仕入情報（複数売主・土地建物別仕入に対応）、固定資産税精算金、付随費用、売上・原価按分を一括管理
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-sm font-bold tracking-tight text-white flex items-center space-x-2">
-                <span>{editingProperty ? `物件情報の編集 [${code}]` : '新規物件・仕入契約の登録'}</span>
-                {location && (
-                  <span className="text-xs font-normal text-slate-300 truncate max-w-xs">
-                    {location}
-                  </span>
-                )}
-              </h2>
-              <p className="text-[11px] text-slate-300 font-medium">
-                仕入情報（複数売主・土地建物別仕入に対応）、固定資産税精算金、付随費用、売上・原価按分を一括管理
-              </p>
+            <div className="flex items-center space-x-2">
+              {renderHeaderControls('dark')}
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-slate-400 hover:text-white p-1.5 rounded-md hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-slate-400 hover:text-white p-1.5 rounded-md hover:bg-white/10 transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
 
         {/* Status & Financial Summary Ribbon */}
         <div className="bg-slate-50 border-b border-slate-200 px-4 py-2 flex items-center justify-between text-xs">
@@ -2462,16 +2472,17 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
             >
               キャンセル
             </button>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              className="px-4 py-1.5 text-xs font-bold bg-[#001529] hover:bg-[#002244] text-white rounded shadow-2xs transition-all cursor-pointer"
-            >
-              {editingProperty ? '変更を保存する' : '物件を登録する'}
-            </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                className="px-4 py-1.5 text-xs font-bold bg-[#001529] hover:bg-[#002244] text-white rounded shadow-2xs transition-all cursor-pointer"
+              >
+                {editingProperty ? '変更を保存する' : '物件を登録する'}
+              </button>
+            </div>
           </div>
-        </div>
-      </div>
-    </div>
+        </>
+      )}
+    </ResizableModal>
   );
 };

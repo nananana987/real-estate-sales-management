@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Building2, X, Check, Save, User, MapPin, Phone, Calendar, Briefcase, FileText, AlertTriangle, ShieldAlert, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
 import { CompanyInfo } from '../types';
+import { ResizableModal } from './ResizableModal';
 
 interface CompanyModalProps {
   isOpen: boolean;
@@ -73,35 +74,45 @@ export const CompanyModal: React.FC<CompanyModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3">
-      <div className="bg-white rounded-lg shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        {/* Header */}
-        <div className="px-4 py-3 bg-white text-slate-900 border-b border-slate-200 flex items-center justify-between">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
-              <Building2 className="w-4 h-4" />
+    <ResizableModal
+      defaultWidth={512}
+      minWidth={420}
+      minHeight={360}
+      storageKey="company_modal"
+      onBackdropClick={onClose}
+    >
+      {({ renderHeaderControls }) => (
+        <>
+          {/* Header */}
+          <div className="px-4 py-3 bg-white text-slate-900 border-b border-slate-200 flex items-center justify-between">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
+                <Building2 className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold tracking-tight text-slate-900">
+                  会社・顧問先情報の設定
+                </h2>
+                <p className="text-[11px] text-slate-500 font-medium">
+                  対象企業・顧問先の基本情報および決算・税務情報の管理
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-sm font-bold tracking-tight text-slate-900">
-                会社・顧問先情報の設定
-              </h2>
-              <p className="text-[11px] text-slate-500 font-medium">
-                対象企業・顧問先の基本情報および決算・税務情報の管理
-              </p>
+            <div className="flex items-center space-x-1.5">
+              {renderHeaderControls('light')}
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 p-1.5 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit}>
-          <div className="p-4 space-y-3.5 max-h-[75vh] overflow-y-auto">
+          {/* Form Body */}
+          <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 p-4 space-y-3.5 overflow-y-auto">
             {/* 会社名 / 屋号 */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -327,7 +338,8 @@ export const CompanyModal: React.FC<CompanyModalProps> = ({
             </div>
           </div>
         </form>
-      </div>
-    </div>
+        </>
+      )}
+    </ResizableModal>
   );
 };
