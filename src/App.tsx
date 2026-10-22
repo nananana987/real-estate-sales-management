@@ -410,39 +410,39 @@ export default function App() {
       {/* Main Container */}
       <main className="flex-1 max-w-[1440px] w-full mx-auto px-3 sm:px-4 lg:px-6 py-3.5 space-y-3.5">
         {/* KPI Financial Overview Ribbon (High Density Modern Financial) */}
-        <div id="kpi-overview-ribbon" className="grid grid-cols-2 md:grid-cols-5 gap-2.5 no-print">
+        <div id="kpi-overview-ribbon" className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5 no-print">
           {/* 1. 当期仕入高 */}
           <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs hover:border-slate-300 transition-all">
             <div className="flex items-center justify-between text-slate-600 text-[11px] mb-0.5">
               <span className="font-bold text-slate-700">当期「仕入」科目</span>
-              <div className="w-5 h-5 rounded bg-blue-50 text-blue-600 flex items-center justify-center">
+              <div className="w-5 h-5 rounded bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                 <Receipt className="w-3 h-3" />
               </div>
             </div>
-            <div className="text-base font-bold text-slate-900 font-mono truncate">
+            <div className="text-base font-bold text-slate-900 font-mono whitespace-nowrap overflow-x-auto">
               {formatCurrency(accountingSummary.totalPurchaseAccount)}
             </div>
             <div className="text-[10px] text-slate-500 mt-0.5">本体＋付随費用合計</div>
           </div>
 
           {/* 2. 当期売上科目 (土地売上・建物売上) */}
-          <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs hover:border-slate-300 transition-all">
+          <div className="col-span-2 md:col-span-2 xl:col-span-2 bg-white p-3 rounded-lg border border-slate-200 shadow-2xs hover:border-slate-300 transition-all">
             <div className="flex items-center justify-between text-slate-600 text-[11px] mb-1.5">
               <span className="font-bold text-slate-700">当期「売上」科目</span>
-              <div className="w-5 h-5 rounded bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <div className="w-5 h-5 rounded bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                 <TrendingUp className="w-3 h-3" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-slate-50/80 p-1.5 rounded border border-slate-100">
-                <span className="text-[10px] text-slate-500 block font-medium">土地売上</span>
-                <span className="text-sm font-bold text-emerald-800 font-mono block truncate">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="bg-slate-50/80 px-2.5 py-1.5 rounded border border-slate-100 flex sm:block items-baseline justify-between gap-2">
+                <span className="text-[10px] text-slate-500 block font-medium whitespace-nowrap">土地売上</span>
+                <span className="text-sm font-bold text-emerald-800 font-mono block whitespace-nowrap">
                   {formatCurrency(accountingSummary.salesLandTotal)}
                 </span>
               </div>
-              <div className="bg-slate-50/80 p-1.5 rounded border border-slate-100">
-                <span className="text-[10px] text-slate-500 block font-medium">建物売上</span>
-                <span className="text-sm font-bold text-teal-800 font-mono block truncate">
+              <div className="bg-slate-50/80 px-2.5 py-1.5 rounded border border-slate-100 flex sm:block items-baseline justify-between gap-2">
+                <span className="text-[10px] text-slate-500 block font-medium whitespace-nowrap">建物売上</span>
+                <span className="text-sm font-bold text-teal-800 font-mono block whitespace-nowrap">
                   {formatCurrency(accountingSummary.salesBuildingTotal)}
                 </span>
               </div>
@@ -453,11 +453,11 @@ export default function App() {
           <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs hover:border-slate-300 transition-all">
             <div className="flex items-center justify-between text-slate-600 text-[11px] mb-0.5">
               <span className="font-bold text-slate-700">当期「売上原価」</span>
-              <div className="w-5 h-5 rounded bg-amber-50 text-amber-600 flex items-center justify-center">
+              <div className="w-5 h-5 rounded bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
                 <Receipt className="w-3 h-3" />
               </div>
             </div>
-            <div className="text-base font-bold text-amber-700 font-mono truncate">
+            <div className="text-base font-bold text-amber-700 font-mono whitespace-nowrap overflow-x-auto">
               {formatCurrency(accountingSummary.costOfGoodsSoldTotal)}
             </div>
             <div className="text-[10px] text-slate-500 mt-0.5">一部売却按分＋完売原価</div>
@@ -467,11 +467,11 @@ export default function App() {
           <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs hover:border-slate-300 transition-all">
             <div className="flex items-center justify-between text-slate-600 text-[11px] mb-0.5">
               <span className="font-bold text-slate-700">当期粗利益 (粗利率)</span>
-              <div className="w-5 h-5 rounded bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <div className="w-5 h-5 rounded bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                 <Percent className="w-3 h-3" />
               </div>
             </div>
-            <div className="text-base font-bold text-slate-900 font-mono truncate">
+            <div className="text-base font-bold text-slate-900 font-mono whitespace-nowrap overflow-x-auto">
               {formatCurrency(accountingSummary.grossProfit)}
             </div>
             <div className="text-[10px] text-slate-500 mt-0.5 font-semibold">
@@ -480,14 +480,14 @@ export default function App() {
           </div>
 
           {/* 5. 期末商品棚卸高 */}
-          <div className="col-span-2 md:col-span-1 bg-indigo-50/50 p-3 rounded-lg border border-indigo-200/80 shadow-2xs hover:border-indigo-300 transition-all">
+          <div className="bg-indigo-50/50 p-3 rounded-lg border border-indigo-200/80 shadow-2xs hover:border-indigo-300 transition-all">
             <div className="flex items-center justify-between text-indigo-950 text-[11px] mb-0.5">
               <span className="font-bold">「期末商品棚卸高」</span>
-              <div className="w-5 h-5 rounded bg-indigo-100 text-indigo-700 flex items-center justify-center">
+              <div className="w-5 h-5 rounded bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
                 <Boxes className="w-3 h-3" />
               </div>
             </div>
-            <div className="text-base font-bold text-indigo-900 font-mono truncate">
+            <div className="text-base font-bold text-indigo-900 font-mono whitespace-nowrap overflow-x-auto">
               {formatCurrency(accountingSummary.endingInventoryTotal)}
             </div>
             <div className="text-[10px] text-indigo-700 mt-0.5 font-medium">
