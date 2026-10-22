@@ -652,7 +652,8 @@ export function parseIncidentalCostsCsv(
     const locationHint = getVal(locIdx).trim();
     const rawCostType = getVal(typeIdx);
     const payee = getVal(payeeIdx).trim();
-    const paymentDate = normalizeDate(getVal(dateIdx));
+    const rawDateStr = getVal(dateIdx).trim();
+    const paymentDate = normalizeDate(rawDateStr);
     const amount = parseNumber(getVal(amountIdx));
     const memo = getVal(memoIdx).trim();
 
@@ -685,8 +686,10 @@ export function parseIncidentalCostsCsv(
       errors.push('金額が入力されていないか、0円です');
     }
 
-    if (!paymentDate) {
-      errors.push('支払日が未入力または不正な日付形式です');
+    if (rawDateStr && !paymentDate) {
+      errors.push('支払日が不正な日付形式です');
+    } else if (!rawDateStr) {
+      warnings.push('支払日が未入力のため「未払」として登録されます');
     }
 
     if (!payee) {
@@ -706,7 +709,7 @@ export function parseIncidentalCostsCsv(
       costType,
       customCostTypeName: customName,
       payee,
-      paymentDate: paymentDate || new Date().toISOString().slice(0, 10),
+      paymentDate: paymentDate || '',
       amount,
       memo,
       isValid,

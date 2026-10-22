@@ -28,6 +28,7 @@ interface HeaderProps {
   activeTab: 'properties' | 'sold_properties' | 'accounting' | 'inventory' | 'transactions' | 'rollover';
   onSelectTab: (tab: 'properties' | 'sold_properties' | 'accounting' | 'inventory' | 'transactions' | 'rollover') => void;
   soldCount?: number;
+  unpaidCostsCount?: number;
   onOpenNewPropertyModal: () => void;
   onOpenFYModal: () => void;
   onOpenCsvImport: () => void;
@@ -55,6 +56,7 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab,
   onSelectTab,
   soldCount,
+  unpaidCostsCount,
   onOpenNewPropertyModal,
   onOpenFYModal,
   onOpenCsvImport,
@@ -298,6 +300,11 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <ArrowLeftRight className="w-3.5 h-3.5" />
             <span>当期取引一覧 (仕入・売上・費用)</span>
+            {unpaidCostsCount !== undefined && unpaidCostsCount > 0 && (
+              <span className="px-1.5 py-0.2 text-[10px] bg-rose-100 text-rose-800 border border-rose-300 rounded-full font-bold">
+                未払費用 {unpaidCostsCount}
+              </span>
+            )}
           </button>
 
           <button

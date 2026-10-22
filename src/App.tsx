@@ -39,7 +39,7 @@ import { PropertyFormModal } from './components/PropertyFormModal';
 import { PropertyDetailModal } from './components/PropertyDetailModal';
 import { AccountingCheckView } from './components/AccountingCheckView';
 import { InventoryReportView } from './components/InventoryReportView';
-import { TransactionsView } from './components/TransactionsView';
+import { TransactionsView, TransactionsSubTab } from './components/TransactionsView';
 import { FiscalYearModal } from './components/FiscalYearModal';
 import { CompanyModal } from './components/CompanyModal';
 import { CsvImportModal } from './components/CsvImportModal';
@@ -108,6 +108,8 @@ export default function App() {
   // Modal State
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
+  const [formInitialTab, setFormInitialTab] = useState<'purchase' | 'incidental' | 'sales' | 'calculator'>('purchase');
+  const [transactionsInitialSubTab, setTransactionsInitialSubTab] = useState<TransactionsSubTab | undefined>(undefined);
 
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [detailProperty, setDetailProperty] = useState<Property | null>(null);
@@ -161,11 +163,16 @@ export default function App() {
 
   const handleOpenNewProperty = () => {
     setEditingProperty(null);
+    setFormInitialTab('purchase');
     setIsFormModalOpen(true);
   };
 
-  const handleEditProperty = (prop: Property) => {
+  const handleEditProperty = (
+    prop: Property,
+    initialTab: 'purchase' | 'incidental' | 'sales' | 'calculator' = 'purchase'
+  ) => {
     setEditingProperty(prop);
+    setFormInitialTab(initialTab);
     setIsFormModalOpen(true);
   };
 
@@ -246,6 +253,15 @@ export default function App() {
     };
   }, [properties, currentFY, fiscalYears]);
 
+  // 全物件の未払付随費用件数
+  const unpaidCostsCount = useMemo(() => {
+    return properties.reduce(
+      (sum, p) =>
+        sum + (p.incidentalCosts || []).filter(c => !c.paymentDate || !c.paymentDate.trim()).length,
+      0
+    );
+  }, [properties]);
+
   // Filtered and Sorted Properties（当期の物件一覧: 進行中・保有中および当期売却済物件）
   const filteredProperties = useMemo(() => {
     return currentPeriodProperties
@@ -289,7 +305,12 @@ export default function App() {
         }
 
         // Status Filter
-        if (statusFilter !== 'all') {
+        if (statusFilter === 'unpaid_incidental') {
+          const hasUnpaid = (property.incidentalCosts || []).some(
+            c => !c.paymentDate || !c.paymentDate.trim()
+          );
+          if (!hasUnpaid) return false;
+        } else if (statusFilter !== 'all') {
           if (fin.status !== statusFilter) return false;
         }
 
@@ -353,10 +374,14 @@ export default function App() {
             setFyModalInitialTab('rollover');
             setIsFYModalOpen(true);
           } else {
+            if (tab === 'transactions' && unpaidCostsCount > 0 && !transactionsInitialSubTab) {
+              setTransactionsInitialSubTab(undefined);
+            }
             setActiveTab(tab);
           }
         }}
         soldCount={priorSoldProperties.length}
+        unpaidCostsCount={unpaidCostsCount}
         onOpenNewPropertyModal={handleOpenNewProperty}
         onOpenFYModal={() => {
           setFyModalInitialTab('list');
@@ -489,6 +514,11 @@ export default function App() {
               filteredCount={filteredProperties.length}
               soldCount={priorSoldProperties.length}
               onNavigateToSoldProperties={() => setActiveTab('sold_properties')}
+              unpaidCostsCount={unpaidCostsCount}
+              onNavigateToUnpaidCosts={() => {
+                setTransactionsInitialSubTab('unpaid_costs');
+                setActiveTab('transactions');
+              }}
               onPrint={() => window.print()}
             />
 
@@ -508,6 +538,8 @@ export default function App() {
                     ? '保有中 (棚卸)'
                     : statusFilter === 'partially_sold'
                     ? '一部売却済'
+                    : statusFilter === 'unpaid_incidental'
+                    ? '未払付随費用あり'
                     : '当期完売'
                 }
                 periodFilterLabel={
@@ -574,6 +606,9 @@ export default function App() {
             properties={properties}
             currentFY={currentFY}
             onSelectProperty={handleOpenDetail}
+            onEditProperty={handleEditProperty}
+            onUpdateProperty={handleSaveProperty}
+            initialSubTab={transactionsInitialSubTab}
           />
         )}
       </main>
@@ -607,11 +642,13 @@ export default function App() {
         onClose={() => {
           setIsFormModalOpen(false);
           setEditingProperty(null);
+          setFormInitialTab('purchase');
         }}
         onSave={handleSaveProperty}
         editingProperty={editingProperty}
         currentFY={currentFY}
         existingProperties={properties}
+        initialTab={formInitialTab}
       />
 
       {/* Property Detail & Profit/Loss Sheet Modal */}

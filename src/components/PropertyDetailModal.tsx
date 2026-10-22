@@ -301,13 +301,28 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     </React.Fragment>
                   );
                 })}
-                {(property.incidentalCosts || []).map(cost => (
-                  <tr key={cost.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-1.5 px-3 font-semibold text-blue-800">
-                      付随費用: {cost.costType}
-                    </td>
-                    <td className="py-1.5 px-3">{cost.payee}</td>
-                    <td className="py-1.5 px-3 font-mono">{cost.paymentDate}</td>
+                {(property.incidentalCosts || []).map(cost => {
+                  const isUnpaid = !cost.paymentDate || !cost.paymentDate.trim();
+                  return (
+                    <tr
+                      key={cost.id}
+                      className={`transition-colors ${
+                        isUnpaid ? 'bg-rose-50/40 hover:bg-rose-50/70' : 'hover:bg-slate-50/80'
+                      }`}
+                    >
+                      <td className="py-1.5 px-3 font-semibold text-blue-800">
+                        付随費用: {cost.costType}
+                      </td>
+                      <td className="py-1.5 px-3">{cost.payee || '-'}</td>
+                      <td className="py-1.5 px-3 font-mono">
+                        {isUnpaid ? (
+                          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                            未払 (支払日未入力)
+                          </span>
+                        ) : (
+                          cost.paymentDate
+                        )}
+                      </td>
                     <td
                       className={`py-1.5 px-3 text-right font-mono font-bold ${
                         cost.amount < 0 ? 'text-red-600' : 'text-blue-700'
@@ -317,7 +332,8 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     </td>
                     <td className="py-1.5 px-3 text-slate-500">{cost.memo || '-'}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
               <tfoot className="bg-slate-50 font-bold border-t border-slate-200">
                 <tr>

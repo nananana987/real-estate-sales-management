@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ArrowLeftRight,
   TrendingUp,
@@ -12,6 +12,9 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  AlertCircle,
+  Check,
+  Edit,
 } from 'lucide-react';
 import { Property, FiscalYear } from '../types';
 import {
@@ -23,21 +26,59 @@ import {
   getPurchaseRecordFixedAssetTax,
 } from '../utils/calculations';
 import { downloadCSV } from '../utils/storage';
+import { DateInput } from './DateInput';
+
+export type TransactionsSubTab = 'purchases' | 'sales' | 'costs' | 'unpaid_costs' | 'pending';
 
 interface TransactionsViewProps {
   properties: Property[];
   currentFY: FiscalYear;
   onSelectProperty: (property: Property) => void;
+  onEditProperty?: (property: Property, initialTab?: 'purchase' | 'incidental' | 'sales' | 'calculator') => void;
+  onUpdateProperty?: (property: Property) => void;
+  initialSubTab?: TransactionsSubTab;
 }
 
 export const TransactionsView: React.FC<TransactionsViewProps> = ({
   properties,
   currentFY,
   onSelectProperty,
+  onEditProperty,
+  onUpdateProperty,
+  initialSubTab,
 }) => {
-  const [subTab, setSubTab] = useState<'purchases' | 'sales' | 'costs' | 'pending'>('sales');
+  const [subTab, setSubTab] = useState<TransactionsSubTab>(initialSubTab || 'sales');
   const [sortField, setSortField] = useState<'date' | 'code'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [draftPaymentDates, setDraftPaymentDates] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (initialSubTab) {
+      setSubTab(initialSubTab);
+    }
+  }, [initialSubTab]);
+
+  const handleConfirmUnpaidCostDate = (property: Property, costId: string, dateVal: string) => {
+    const trimmed = (dateVal || '').trim();
+    if (!trimmed) {
+      alert('支払日を入力してください（例: 260515 または 2026-05-15）');
+      return;
+    }
+    if (!onUpdateProperty) return;
+    const updatedCosts = (property.incidentalCosts || []).map(c =>
+      c.id === costId ? { ...c, paymentDate: trimmed } : c
+    );
+    onUpdateProperty({
+      ...property,
+      incidentalCosts: updatedCosts,
+      updatedAt: new Date().toISOString(),
+    });
+    setDraftPaymentDates(prev => {
+      const next = { ...prev };
+      delete next[costId];
+      return next;
+    });
+  };
 
   const handleSort = (field: 'date' | 'code') => {
     if (sortField === field) {
@@ -94,9 +135,20 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   // 3. 当期仕入付随費用 (支払日が当期内)
   const currentIncidentalCosts: {
     property: Property;
+    costId: string;
     costType: string;
     payee: string;
     paymentDate: string;
+    amount: number;
+    memo: string;
+  }[] = [];
+
+  // 3-2. 未払の仕入付随費用 (支払日が空欄)
+  const unpaidIncidentalCosts: {
+    property: Property;
+    costId: string;
+    costType: string;
+    payee: string;
     amount: number;
     memo: string;
   }[] = [];
@@ -220,11 +272,21 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
       }
     });
 
-    // Incidental Costs in FY
+    // Incidental Costs in FY & Unpaid Incidental Costs
     (prop.incidentalCosts || []).forEach(cost => {
-      if (isDateInFiscalYear(cost.paymentDate, currentFY)) {
+      if (!cost.paymentDate || !cost.paymentDate.trim()) {
+        unpaidIncidentalCosts.push({
+          property: prop,
+          costId: cost.id,
+          costType: cost.costType,
+          payee: cost.payee || '-',
+          amount: cost.amount || 0,
+          memo: cost.memo || '',
+        });
+      } else if (isDateInFiscalYear(cost.paymentDate, currentFY)) {
         currentIncidentalCosts.push({
           property: prop,
+          costId: cost.id,
           costType: cost.costType,
           payee: cost.payee || '-',
           paymentDate: cost.paymentDate,
@@ -311,6 +373,11 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
     }
   });
 
+    unpaidIncidentalCosts.sort((a, b) => {
+      const cmp = (a.property.code || '').localeCompare(b.property.code || '', undefined, { numeric: true });
+      return sortOrder === 'asc' ? cmp : -cmp;
+    });
+
   const handleExportCSV = () => {
     let csv = `当期取引一覧 (${currentFY.name})\n\n`;
 
@@ -336,6 +403,12 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
       currentIncidentalCosts.forEach(c => {
         csv += `"${c.paymentDate}","${c.property.code}","${c.property.location}","${c.costType}","${c.payee}",${c.amount},"${c.memo}"\n`;
       });
+    } else if (subTab === 'unpaid_costs') {
+      csv += `【未払の仕入付随費用一覧】\n`;
+      csv += `支払状態,物件コード,物件所在地,費用の種類,相手先(支払先),金額(円),備考\n`;
+      unpaidIncidentalCosts.forEach(c => {
+        csv += `"未払","${c.property.code}","${c.property.location}","${c.costType}","${c.payee}",${c.amount},"${c.memo}"\n`;
+      });
     } else {
       csv += `【未決済・契約中物件一覧】\n`;
       csv += `契約日,物件コード,物件所在地,現在の状態,契約金額(円),手付金額(円),手付金支払日\n`;
@@ -357,7 +430,9 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
       : subTab === 'purchases'
       ? '当期仕入 (決済済)'
       : subTab === 'costs'
-      ? '当期仕入付随費用'
+      ? '当期仕入付随費用 (支払済)'
+      : subTab === 'unpaid_costs'
+      ? '未払の仕入付随費用一覧'
       : '未決済・契約中';
 
   return (
@@ -481,6 +556,24 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
         >
           <Receipt className="w-3.5 h-3.5 text-amber-600" />
           <span>当期仕入付随費用 ({currentIncidentalCosts.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSubTab('unpaid_costs')}
+          className={`py-2 px-3 text-xs font-bold border-b-2 flex items-center space-x-1.5 cursor-pointer transition-colors whitespace-nowrap ${
+            subTab === 'unpaid_costs'
+              ? 'border-rose-600 text-rose-700 bg-rose-50/40'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+          <span>未払付随費用 ({unpaidIncidentalCosts.length})</span>
+          {unpaidIncidentalCosts.length > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-600 text-white">
+              {unpaidIncidentalCosts.length}
+            </span>
+          )}
         </button>
 
         <button
@@ -843,102 +936,293 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
         )}
 
         {subTab === 'costs' && (
-          <div className="overflow-x-auto">
-            {currentIncidentalCosts.length === 0 ? (
-              <div className="p-6 text-center text-slate-400 text-xs">
-                当期に支払われた仕入付随費用はありません。
+          <div className="space-y-3">
+            {unpaidIncidentalCosts.length > 0 && (
+              <div className="bg-rose-50/80 border border-rose-200 rounded-lg p-2.5 flex flex-wrap items-center justify-between gap-2 no-print">
+                <div className="flex items-center space-x-2 text-xs text-rose-900">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>
+                    支払日が未入力（<strong>未払</strong>）の仕入付随費用が{' '}
+                    <strong className="underline">{unpaidIncidentalCosts.length}件</strong>（合計{' '}
+                    <strong className="font-mono">
+                      {formatCurrency(unpaidIncidentalCosts.reduce((s, c) => s + c.amount, 0))}
+                    </strong>
+                    ）あります。
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSubTab('unpaid_costs')}
+                  className="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors cursor-pointer"
+                >
+                  未払付随費用一覧を確認・支払日を入力 →
+                </button>
               </div>
-            ) : (
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-[#f8fafc] text-slate-600 font-bold border-b border-slate-200">
-                  <tr>
-                    <th
-                      className="py-1.5 px-2.5 col-date whitespace-nowrap w-[105px] min-w-[105px] cursor-pointer select-none hover:bg-slate-100 transition-colors"
-                      onClick={() => handleSort('date')}
-                      title="支払日で並び替え (昇順/降順)"
-                    >
-                      <div className="flex items-center space-x-1">
-                        <span>支払日</span>
-                        <span className="no-print inline-flex">
-                          {sortField === 'date' ? (
-                            sortOrder === 'asc' ? (
-                              <ArrowUp className="w-3.5 h-3.5 text-blue-600" />
-                            ) : (
-                              <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
-                            )
-                          ) : (
-                            <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
-                          )}
-                        </span>
-                      </div>
-                    </th>
-                    <th
-                      className="py-1.5 px-2.5 cursor-pointer select-none hover:bg-slate-100 transition-colors"
-                      onClick={() => handleSort('code')}
-                      title="物件コードで並び替え (昇順/降順)"
-                    >
-                      <div className="flex items-center space-x-1">
-                        <span>物件コード・物件名</span>
-                        <span className="no-print inline-flex">
-                          {sortField === 'code' ? (
-                            sortOrder === 'asc' ? (
-                              <ArrowUp className="w-3.5 h-3.5 text-blue-600" />
-                            ) : (
-                              <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
-                            )
-                          ) : (
-                            <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
-                          )}
-                        </span>
-                      </div>
-                    </th>
-                    <th className="py-1.5 px-2.5">費用の種類</th>
-                    <th className="py-1.5 px-2.5">相手先 (支払先)</th>
-                    <th className="py-1.5 px-2.5 text-right">金額</th>
-                    <th className="py-1.5 px-2.5">備考</th>
-                    <th className="py-1.5 px-2.5 text-center no-print">操作</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {currentIncidentalCosts.map((c, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-1.5 px-2.5 col-date font-mono font-bold text-slate-900 whitespace-nowrap w-[105px] min-w-[105px]">
-                        {c.paymentDate}
-                      </td>
-                      <td className="py-1.5 px-2.5 font-semibold text-slate-800">
-                        <span className="font-mono text-slate-500 font-bold mr-1">
-                          [{c.property.code}]
-                        </span>
-                        {c.property.name}
-                      </td>
-                      <td className="py-1.5 px-2.5">
-                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                          {c.costType}
-                        </span>
-                      </td>
-                      <td className="py-1.5 px-2.5 text-slate-700">{c.payee}</td>
-                      <td
-                        className={`py-1.5 px-2.5 text-right font-mono font-bold ${
-                          c.amount < 0 ? 'text-red-600' : 'text-blue-700'
-                        }`}
-                      >
-                        {formatCurrency(c.amount)}
-                      </td>
-                      <td className="py-1.5 px-2.5 text-slate-500">{c.memo || '-'}</td>
-                      <td className="py-1.5 px-2.5 text-center no-print">
-                        <button
-                          type="button"
-                          onClick={() => onSelectProperty(c.property)}
-                          className="text-blue-600 hover:text-blue-900 font-bold underline cursor-pointer text-xs"
-                        >
-                          開く
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             )}
+
+            <div className="overflow-x-auto">
+              {currentIncidentalCosts.length === 0 ? (
+                <div className="p-6 text-center text-slate-400 text-xs">
+                  当期に支払われた仕入付随費用はありません。
+                </div>
+              ) : (
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-[#f8fafc] text-slate-600 font-bold border-b border-slate-200">
+                    <tr>
+                      <th
+                        className="py-1.5 px-2.5 col-date whitespace-nowrap w-[105px] min-w-[105px] cursor-pointer select-none hover:bg-slate-100 transition-colors"
+                        onClick={() => handleSort('date')}
+                        title="支払日で並び替え (昇順/降順)"
+                      >
+                        <div className="flex items-center space-x-1">
+                          <span>支払日</span>
+                          <span className="no-print inline-flex">
+                            {sortField === 'date' ? (
+                              sortOrder === 'asc' ? (
+                                <ArrowUp className="w-3.5 h-3.5 text-blue-600" />
+                              ) : (
+                                <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                              )
+                            ) : (
+                              <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                            )}
+                          </span>
+                        </div>
+                      </th>
+                      <th
+                        className="py-1.5 px-2.5 cursor-pointer select-none hover:bg-slate-100 transition-colors"
+                        onClick={() => handleSort('code')}
+                        title="物件コードで並び替え (昇順/降順)"
+                      >
+                        <div className="flex items-center space-x-1">
+                          <span>物件コード・物件所在地</span>
+                          <span className="no-print inline-flex">
+                            {sortField === 'code' ? (
+                              sortOrder === 'asc' ? (
+                                <ArrowUp className="w-3.5 h-3.5 text-blue-600" />
+                              ) : (
+                                <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                              )
+                            ) : (
+                              <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
+                            )}
+                          </span>
+                        </div>
+                      </th>
+                      <th className="py-1.5 px-2.5">費用の種類</th>
+                      <th className="py-1.5 px-2.5">相手先 (支払先)</th>
+                      <th className="py-1.5 px-2.5 text-right">金額</th>
+                      <th className="py-1.5 px-2.5">備考</th>
+                      <th className="py-1.5 px-2.5 text-center no-print">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {currentIncidentalCosts.map((c, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-1.5 px-2.5 col-date font-mono font-bold text-slate-900 whitespace-nowrap w-[105px] min-w-[105px]">
+                          {c.paymentDate}
+                        </td>
+                        <td className="py-1.5 px-2.5 font-semibold text-slate-800">
+                          <span className="font-mono text-slate-500 font-bold mr-1">
+                            [{c.property.code}]
+                          </span>
+                          {c.property.location || c.property.name}
+                        </td>
+                        <td className="py-1.5 px-2.5">
+                          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                            {c.costType}
+                          </span>
+                        </td>
+                        <td className="py-1.5 px-2.5 text-slate-700">{c.payee}</td>
+                        <td
+                          className={`py-1.5 px-2.5 text-right font-mono font-bold ${
+                            c.amount < 0 ? 'text-red-600' : 'text-blue-700'
+                          }`}
+                        >
+                          {formatCurrency(c.amount)}
+                        </td>
+                        <td className="py-1.5 px-2.5 text-slate-500">{c.memo || '-'}</td>
+                        <td className="py-1.5 px-2.5 text-center no-print">
+                          <button
+                            type="button"
+                            onClick={() => onSelectProperty(c.property)}
+                            className="text-blue-600 hover:text-blue-900 font-bold underline cursor-pointer text-xs"
+                          >
+                            開く
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  {currentIncidentalCosts.length > 0 && (
+                    <tfoot className="bg-slate-100/80 font-bold border-t-2 border-slate-300 text-slate-900">
+                      <tr>
+                        <td colSpan={4} className="py-2 px-2.5 text-center text-slate-700">
+                          当期仕入付随費用 合計 ({currentIncidentalCosts.length}件)
+                        </td>
+                        <td className="py-2 px-2.5 text-right font-mono text-blue-800">
+                          {formatCurrency(currentIncidentalCosts.reduce((sum, c) => sum + c.amount, 0))}
+                        </td>
+                        <td colSpan={2}></td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              )}
+            </div>
+          </div>
+        )}
+
+        {subTab === 'unpaid_costs' && (
+          <div className="space-y-3">
+            <div className="bg-rose-50/60 border border-rose-200 rounded-lg p-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <div>
+                  <h3 className="text-xs font-bold text-rose-950">
+                    未払の仕入付随費用一覧（支払日未入力）
+                  </h3>
+                  <p className="text-[11px] text-rose-800">
+                    支払日が空欄で登録されている付随費用です。一覧から直接支払日を入力して「支払日登録」を押すと支払済に更新されます。
+                  </p>
+                </div>
+              </div>
+              <div className="text-right bg-white px-3 py-1.5 rounded border border-rose-200 shadow-2xs">
+                <span className="text-[10px] text-slate-500 block">未払付随費用 合計 ({unpaidIncidentalCosts.length}件)</span>
+                <span className="text-sm font-bold font-mono text-rose-700">
+                  {formatCurrency(unpaidIncidentalCosts.reduce((sum, c) => sum + c.amount, 0))}
+                </span>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              {unpaidIncidentalCosts.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs">
+                  現在、未払（支払日未入力）の仕入付随費用はありません。
+                </div>
+              ) : (
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-[#f8fafc] text-slate-600 font-bold border-b border-slate-200">
+                    <tr>
+                      <th className="py-1.5 px-2.5 whitespace-nowrap w-[80px]">状態</th>
+                      <th
+                        className="py-1.5 px-2.5 cursor-pointer select-none hover:bg-slate-100 transition-colors"
+                        onClick={() => handleSort('code')}
+                      >
+                        <div className="flex items-center space-x-1">
+                          <span>物件コード・物件所在地</span>
+                          <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60 no-print" />
+                        </div>
+                      </th>
+                      <th className="py-1.5 px-2.5">費用の種類</th>
+                      <th className="py-1.5 px-2.5">相手先 (支払先)</th>
+                      <th className="py-1.5 px-2.5 text-right">金額</th>
+                      <th className="py-1.5 px-2.5">備考</th>
+                      <th className="py-1.5 px-2.5 no-print min-w-[230px]">支払日を後から入力</th>
+                      <th className="py-1.5 px-2.5 text-center no-print">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {unpaidIncidentalCosts.map(c => {
+                      const draftDate = draftPaymentDates[c.costId] || '';
+                      return (
+                        <tr key={c.costId} className="hover:bg-rose-50/30 transition-colors">
+                          <td className="py-2 px-2.5 whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                              未払
+                            </span>
+                          </td>
+                          <td className="py-2 px-2.5 font-semibold text-slate-800">
+                            <span className="font-mono text-slate-500 font-bold mr-1">
+                              [{c.property.code}]
+                            </span>
+                            {c.property.location || c.property.name}
+                          </td>
+                          <td className="py-2 px-2.5">
+                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                              {c.costType}
+                            </span>
+                          </td>
+                          <td className="py-2 px-2.5 text-slate-700 font-medium">{c.payee}</td>
+                          <td
+                            className={`py-2 px-2.5 text-right font-mono font-bold ${
+                              c.amount < 0 ? 'text-red-600' : 'text-slate-900'
+                            }`}
+                          >
+                            {formatCurrency(c.amount)}
+                          </td>
+                          <td className="py-2 px-2.5 text-slate-500">{c.memo || '-'}</td>
+                          <td className="py-2 px-2.5 no-print">
+                            {onUpdateProperty ? (
+                              <div className="flex items-center space-x-1.5">
+                                <div className="w-[140px]">
+                                  <DateInput
+                                    value={draftDate}
+                                    onChange={val =>
+                                      setDraftPaymentDates(prev => ({
+                                        ...prev,
+                                        [c.costId]: val,
+                                      }))
+                                    }
+                                    placeholder="例: 260515"
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleConfirmUnpaidCostDate(c.property, c.costId, draftDate)
+                                  }
+                                  className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center space-x-0.5 shrink-0 cursor-pointer transition-colors"
+                                  title="入力した支払日で確定し、支払済にします"
+                                >
+                                  <Check className="w-3 h-3" />
+                                  <span>支払日登録</span>
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 text-[11px]">支払日未入力</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-2.5 text-center no-print">
+                            <div className="flex items-center justify-center space-x-2">
+                              {onEditProperty && (
+                                <button
+                                  type="button"
+                                  onClick={() => onEditProperty(c.property, 'incidental')}
+                                  className="text-amber-700 hover:text-amber-900 font-bold underline cursor-pointer text-xs flex items-center space-x-0.5"
+                                  title="付随費用タブを開いて編集"
+                                >
+                                  <Edit className="w-3 h-3" />
+                                  <span>編集</span>
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => onSelectProperty(c.property)}
+                                className="text-blue-600 hover:text-blue-900 font-bold underline cursor-pointer text-xs"
+                              >
+                                詳細
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="bg-rose-50/70 font-bold border-t-2 border-rose-200 text-slate-900">
+                    <tr>
+                      <td colSpan={4} className="py-2 px-2.5 text-center text-rose-900">
+                        未払の仕入付随費用 合計 ({unpaidIncidentalCosts.length}件)
+                      </td>
+                      <td className="py-2 px-2.5 text-right font-mono text-rose-700">
+                        {formatCurrency(unpaidIncidentalCosts.reduce((sum, c) => sum + c.amount, 0))}
+                      </td>
+                      <td colSpan={3}></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              )}
+            </div>
           </div>
         )}
 

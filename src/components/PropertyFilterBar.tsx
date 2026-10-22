@@ -9,10 +9,11 @@ import {
   Building,
   CheckCircle,
   Printer,
+  AlertCircle,
 } from 'lucide-react';
 import { PropertyStatus } from '../types';
 
-export type StatusFilterOption = 'all' | PropertyStatus;
+export type StatusFilterOption = 'all' | PropertyStatus | 'unpaid_incidental';
 export type PeriodFilterOption = 'all' | 'current_period_only' | 'inventory_only' | 'sold_only';
 export type SortOption =
   | 'code_asc'
@@ -37,6 +38,8 @@ interface PropertyFilterBarProps {
   filteredCount: number;
   soldCount?: number;
   onNavigateToSoldProperties?: () => void;
+  unpaidCostsCount?: number;
+  onNavigateToUnpaidCosts?: () => void;
   onPrint?: () => void;
 }
 
@@ -55,6 +58,8 @@ export const PropertyFilterBar: React.FC<PropertyFilterBarProps> = ({
   filteredCount,
   soldCount,
   onNavigateToSoldProperties,
+  unpaidCostsCount,
+  onNavigateToUnpaidCosts,
   onPrint,
 }) => {
   return (
@@ -219,6 +224,30 @@ export const PropertyFilterBar: React.FC<PropertyFilterBarProps> = ({
           >
             当期完売
           </button>
+
+          <button
+            type="button"
+            onClick={() => onStatusFilterChange('unpaid_incidental')}
+            className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors cursor-pointer inline-flex items-center space-x-1 ${
+              statusFilter === 'unpaid_incidental'
+                ? 'bg-rose-600 text-white font-bold'
+                : 'bg-rose-50 text-rose-800 border border-rose-200/80 hover:bg-rose-100'
+            }`}
+          >
+            <span>未払付随費用あり</span>
+          </button>
+
+          {onNavigateToUnpaidCosts && unpaidCostsCount !== undefined && unpaidCostsCount > 0 && (
+            <button
+              type="button"
+              onClick={onNavigateToUnpaidCosts}
+              className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded text-[11px] font-bold text-rose-800 bg-rose-100/80 hover:bg-rose-200/80 transition-colors border border-rose-300 ml-1 cursor-pointer"
+              title="未払の仕入付随費用一覧ページへ移動して確認・支払日入力"
+            >
+              <AlertCircle className="w-3 h-3 text-rose-600" />
+              <span>未払付随費用一覧 ({unpaidCostsCount}件) →</span>
+            </button>
+          )}
 
           {onNavigateToSoldProperties && soldCount !== undefined && soldCount > 0 && (
             <button

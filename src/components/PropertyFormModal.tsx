@@ -39,6 +39,7 @@ interface PropertyFormModalProps {
   editingProperty: Property | null;
   currentFY: FiscalYear;
   existingProperties?: Property[];
+  initialTab?: 'purchase' | 'incidental' | 'sales' | 'calculator';
 }
 
 const LAND_CATEGORIES: string[] = [
@@ -76,8 +77,11 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
   editingProperty,
   currentFY,
   existingProperties = [],
+  initialTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<'purchase' | 'incidental' | 'sales' | 'calculator'>('purchase');
+  const [activeTab, setActiveTab] = useState<'purchase' | 'incidental' | 'sales' | 'calculator'>(
+    initialTab || 'purchase'
+  );
 
   // Form State
   const [code, setCode] = useState('');
@@ -220,9 +224,9 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
     setNewCostPaymentDate('');
     setNewCostAmount('');
     setNewCostMemo('');
-    setActiveTab('purchase');
+    setActiveTab(initialTab || 'purchase');
     setEditingSaleIndex(null);
-  }, [editingProperty, isOpen, existingProperties]);
+  }, [editingProperty, isOpen, existingProperties, initialTab]);
 
   if (!isOpen) return null;
 
@@ -406,7 +410,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
             ...c,
             costType: trimmedType,
             payee: newCostPayee,
-            paymentDate: newCostPaymentDate || new Date().toISOString().slice(0, 10),
+            paymentDate: (newCostPaymentDate || '').trim(),
             amount: parsedAmount,
             memo: newCostMemo,
           };
@@ -422,7 +426,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
         propertyId: editingProperty?.id || 'temp',
         costType: trimmedType,
         payee: newCostPayee,
-        paymentDate: newCostPaymentDate || new Date().toISOString().slice(0, 10),
+        paymentDate: (newCostPaymentDate || '').trim(),
         amount: parsedAmount,
         memo: newCostMemo,
       };
@@ -432,6 +436,12 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
       setNewCostPaymentDate('');
       setNewCostMemo('');
     }
+  };
+
+  const handleQuickUpdateCostPaymentDate = (costId: string, paymentDate: string) => {
+    setIncidentalCosts(prev =>
+      prev.map(c => (c.id === costId ? { ...c, paymentDate: (paymentDate || '').trim() } : c))
+    );
   };
 
   const handleRemoveIncidentalCost = (id: string) => {
@@ -837,6 +847,11 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
             {incidentalCosts.length > 0 && (
               <span className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded font-bold font-mono">
                 {formatCurrency(totalIncidental)}
+              </span>
+            )}
+            {incidentalCosts.some(c => !c.paymentDate) && (
+              <span className="text-[10px] bg-rose-100 text-rose-800 border border-rose-200 px-1.5 py-0.2 rounded font-bold">
+                未払 {incidentalCosts.filter(c => !c.paymentDate).length}件
               </span>
             )}
           </button>
@@ -1634,14 +1649,22 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
-                      支払日 <span className="text-red-500">*</span>
-                    </label>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        支払日
+                      </label>
+                      <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
+                        空欄で「未払」登録可
+                      </span>
+                    </div>
                     <DateInput
                       value={newCostPaymentDate}
                       onChange={setNewCostPaymentDate}
-                      placeholder="例: 260515"
+                      placeholder="例: 260515 (未入力で未払)"
                     />
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      ※空欄で登録すると「未払」になり後から支払日を入力できます
+                    </p>
                   </div>
 
                   <div>
@@ -1743,10 +1766,23 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
 
               {/* 付随費用一覧テーブル */}
               <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden">
-                <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-slate-900">
-                    登録済みの仕入付随費用一覧 ({incidentalCosts.length}件)
-                  </h4>
+                <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center space-x-2">
+                    <h4 className="text-xs font-bold text-slate-900">
+                      登録済みの仕入付随費用一覧 ({incidentalCosts.length}件)
+                    </h4>
+                    {incidentalCosts.some(c => !c.paymentDate) && (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                        うち未払: {incidentalCosts.filter(c => !c.paymentDate).length}件 (
+                        {formatCurrency(
+                          incidentalCosts
+                            .filter(c => !c.paymentDate)
+                            .reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
+                        )}
+                        )
+                      </span>
+                    )}
+                  </div>
                   <span className="text-xs font-bold text-slate-900 font-mono">
                     累計: {formatCurrency(totalIncidental)}
                   </span>
@@ -1763,7 +1799,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                         <tr className="bg-slate-50/70 text-slate-600 border-b border-slate-200 text-[11px]">
                           <th className="py-2 px-3">費用の種類</th>
                           <th className="py-2 px-3">支払先</th>
-                          <th className="py-2 px-3">支払日</th>
+                          <th className="py-2 px-3">支払日 (未払時は直接入力可)</th>
                           <th className="py-2 px-3 text-right">金額 (円)</th>
                           <th className="py-2 px-3">備考</th>
                           <th className="py-2 px-3 text-center w-20">操作</th>
@@ -1772,18 +1808,26 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                       <tbody className="divide-y divide-slate-100">
                         {incidentalCosts.map(cost => {
                           const isBeingEdited = editingCostId === cost.id;
+                          const isUnpaid = !cost.paymentDate || !cost.paymentDate.trim();
                           return (
                             <tr
                               key={cost.id}
                               className={`transition-colors ${
                                 isBeingEdited
                                   ? 'bg-blue-50/90 font-medium border-l-2 border-l-blue-600'
+                                  : isUnpaid
+                                  ? 'bg-rose-50/30 hover:bg-rose-50/60'
                                   : 'hover:bg-slate-50/50'
                               }`}
                             >
                               <td className="py-2 px-3 font-semibold text-slate-800">
                                 <div className="flex items-center space-x-1.5">
                                   <span>{cost.costType}</span>
+                                  {isUnpaid && (
+                                    <span className="px-1.5 py-0.2 rounded text-[10px] bg-rose-100 text-rose-800 border border-rose-200 font-bold">
+                                      未払
+                                    </span>
+                                  )}
                                   {isBeingEdited && (
                                     <span className="px-1 py-0.2 rounded text-[9px] bg-blue-200 text-blue-900 font-bold">
                                       編集中
@@ -1792,7 +1836,23 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                                 </div>
                               </td>
                               <td className="py-2 px-3 text-slate-600">{cost.payee || '-'}</td>
-                              <td className="py-2 px-3 font-mono text-slate-600">{cost.paymentDate}</td>
+                              <td className="py-2 px-3 font-mono text-slate-600">
+                                {isUnpaid ? (
+                                  <div className="flex items-center space-x-1.5 max-w-[170px]">
+                                    <DateInput
+                                      value={cost.paymentDate || ''}
+                                      onChange={val => handleQuickUpdateCostPaymentDate(cost.id, val)}
+                                      placeholder="支払日を入力 (例:260515)"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center space-x-1.5">
+                                    <span className="font-mono font-semibold text-slate-800">
+                                      {cost.paymentDate}
+                                    </span>
+                                  </div>
+                                )}
+                              </td>
                               <td
                                 className={`py-2 px-3 text-right font-bold font-mono ${
                                   cost.amount < 0 ? 'text-red-600' : 'text-slate-900'

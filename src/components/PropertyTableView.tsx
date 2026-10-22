@@ -298,6 +298,21 @@ export const PropertyTableView: React.FC<PropertyTableViewProps> = ({
                             [前期繰越]
                           </div>
                         )}
+                        {(property.incidentalCosts || []).some(
+                          c => !c.paymentDate || !c.paymentDate.trim()
+                        ) && (
+                          <div className="mt-0.5">
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                              未払費用{' '}
+                              {
+                                (property.incidentalCosts || []).filter(
+                                  c => !c.paymentDate || !c.paymentDate.trim()
+                                ).length
+                              }
+                              件
+                            </span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Total Cost */}
@@ -483,22 +498,42 @@ export const PropertyTableView: React.FC<PropertyTableViewProps> = ({
                                         );
                                       });
                                     })()}
-                                    {(property.incidentalCosts || []).map(cost => (
-                                      <tr key={cost.id} className="hover:bg-slate-50/80 transition-colors">
-                                        <td className="py-1.5 px-3 font-semibold text-blue-800">
-                                          付随費用: {cost.costType}
-                                        </td>
-                                        <td className="py-1.5 px-3 text-slate-700">{cost.payee || '-'}</td>
-                                        <td className="py-1.5 px-3 font-mono text-slate-600">{cost.paymentDate || '-'}</td>
-                                        <td
-                                          className={`py-1.5 px-3 text-right font-mono font-bold ${
-                                            cost.amount < 0 ? 'text-red-600' : 'text-blue-700'
+                                    {(property.incidentalCosts || []).map(cost => {
+                                      const isUnpaid = !cost.paymentDate || !cost.paymentDate.trim();
+                                      return (
+                                        <tr
+                                          key={cost.id}
+                                          className={`transition-colors ${
+                                            isUnpaid
+                                              ? 'bg-rose-50/40 hover:bg-rose-50/70'
+                                              : 'hover:bg-slate-50/80'
                                           }`}
                                         >
-                                          {formatCurrency(cost.amount)}
-                                        </td>
-                                      </tr>
-                                    ))}
+                                          <td className="py-1.5 px-3 font-semibold text-blue-800">
+                                            付随費用: {cost.costType}
+                                          </td>
+                                          <td className="py-1.5 px-3 text-slate-700">
+                                            {cost.payee || '-'}
+                                          </td>
+                                          <td className="py-1.5 px-3 font-mono text-slate-600">
+                                            {isUnpaid ? (
+                                              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                                未払
+                                              </span>
+                                            ) : (
+                                              cost.paymentDate
+                                            )}
+                                          </td>
+                                          <td
+                                            className={`py-1.5 px-3 text-right font-mono font-bold ${
+                                              cost.amount < 0 ? 'text-red-600' : 'text-blue-700'
+                                            }`}
+                                          >
+                                            {formatCurrency(cost.amount)}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
                                     {property.landPurchasePrice <= 0 && property.buildingPurchasePrice <= 0 && fin.purchaseFixedAssetTaxTotal <= 0 && (!property.incidentalCosts || property.incidentalCosts.length === 0) && (
                                       <tr>
                                         <td colSpan={4} className="py-3 px-3 text-center text-slate-400">
