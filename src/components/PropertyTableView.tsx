@@ -24,7 +24,10 @@ import {
   getPropertyPurchases,
   getSaleFixedAssetTax,
   getPropertyTypeBadgeClass,
+  getPropertyTotalAttachmentsCount,
 } from '../utils/calculations';
+import { AttachmentBadgeList } from './AttachmentManager';
+import { Paperclip } from 'lucide-react';
 
 interface PropertyTableViewProps {
   properties: Property[];
@@ -251,6 +254,15 @@ export const PropertyTableView: React.FC<PropertyTableViewProps> = ({
                           <span className="hidden print:inline font-bold text-slate-900 text-xs">
                             {property.location || '所在地未設定'}
                           </span>
+                          {getPropertyTotalAttachmentsCount(property) > 0 && (
+                            <span
+                              className="inline-flex items-center space-x-0.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 shrink-0 no-print"
+                              title={`添付書類・証憑 ${getPropertyTotalAttachmentsCount(property)}件`}
+                            >
+                              <Paperclip className="w-2.5 h-2.5 text-blue-600" />
+                              <span>{getPropertyTotalAttachmentsCount(property)}</span>
+                            </span>
+                          )}
                         </div>
                         {property.name && property.name !== property.location && (
                           <p className="text-[10px] text-slate-400 print:text-slate-600 truncate max-w-[240px] print:max-w-none mt-0.5">
@@ -395,6 +407,21 @@ export const PropertyTableView: React.FC<PropertyTableViewProps> = ({
                       <tr className="bg-slate-50/90">
                         <td colSpan={12} className="p-3 border-b border-slate-200">
                           <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-2xs space-y-3.5">
+                            {/* 0. 物件基本資料の添付ファイル（公図・謄本・測量図等） */}
+                            {property.attachments && property.attachments.length > 0 && (
+                              <div className="bg-slate-50/80 px-3 py-2 rounded-lg border border-slate-200 flex flex-wrap items-center gap-2">
+                                <span className="text-xs font-bold text-slate-700 flex items-center space-x-1">
+                                  <Paperclip className="w-3.5 h-3.5 text-blue-600" />
+                                  <span>物件基本資料 ({property.attachments.length}件):</span>
+                                </span>
+                                <AttachmentBadgeList
+                                  compact
+                                  attachments={property.attachments}
+                                  contextLabel={`物件 [${property.code}] ${property.location} 基本資料`}
+                                />
+                              </div>
+                            )}
+
                             {/* 1. 仕入原価内訳 (本体 ＋ 付随費用) - 備考不要 */}
                             <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
                               <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 font-bold text-xs text-slate-800 flex items-center justify-between">
@@ -411,6 +438,7 @@ export const PropertyTableView: React.FC<PropertyTableViewProps> = ({
                                       <th className="py-1.5 px-3">相手先 (支払先)</th>
                                       <th className="py-1.5 px-3">支払日 / 決済日</th>
                                       <th className="py-1.5 px-3 text-right">金額 (円)</th>
+                                      <th className="py-1.5 px-3 no-print">添付書類</th>
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-slate-100">
@@ -427,6 +455,20 @@ export const PropertyTableView: React.FC<PropertyTableViewProps> = ({
                                               ? `[${p.label}] `
                                               : `[仕入#${idx + 1}] `
                                             : '';
+                                        const hasPurchaseAtts = p.attachments && p.attachments.length > 0;
+                                        let renderedAtts = false;
+                                        const renderPurchaseAttsOnce = () => {
+                                          if (renderedAtts || !hasPurchaseAtts) return '-';
+                                          renderedAtts = true;
+                                          return (
+                                            <AttachmentBadgeList
+                                              compact
+                                              attachments={p.attachments}
+                                              contextLabel={`${prefix || '仕入契約'} (${p.sellerName || '-'})`}
+                                            />
+                                          );
+                                        };
+
                                         return (
                                           <React.Fragment key={p.id || idx}>
                                             {(p.landPurchasePrice || 0) > 0 && (
@@ -448,6 +490,9 @@ export const PropertyTableView: React.FC<PropertyTableViewProps> = ({
                                                 <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900">
                                                   {formatCurrency(p.landPurchasePrice)}
                                                 </td>
+                                                <td className="py-1.5 px-3 text-slate-400 no-print">
+                                                  {renderPurchaseAttsOnce()}
+                                                </td>
                                               </tr>
                                             )}
                                             {bldgGross > 0 && (
@@ -468,6 +513,9 @@ export const PropertyTableView: React.FC<PropertyTableViewProps> = ({
                                                 </td>
                                                 <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900">
                                                   {formatCurrency(bldgGross)}
+                                                </td>
+                                                <td className="py-1.5 px-3 text-slate-400 no-print">
+                                                  {renderPurchaseAttsOnce()}
                                                 </td>
                                               </tr>
                                             )}
@@ -491,6 +539,28 @@ export const PropertyTableView: React.FC<PropertyTableViewProps> = ({
                                                 </td>
                                                 <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900">
                                                   {formatCurrency(pTax.total)}
+                                                </td>
+                                                <td className="py-1.5 px-3 text-slate-400 no-print">
+                                                  {renderPurchaseAttsOnce()}
+                                                </td>
+                                              </tr>
+                                            )}
+                                            {!renderedAtts && hasPurchaseAtts && (
+                                              <tr className="hover:bg-slate-50/80 transition-colors">
+                                                <td className="py-1.5 px-3 font-bold text-slate-800">
+                                                  {prefix}仕入契約書類
+                                                </td>
+                                                <td className="py-1.5 px-3 text-slate-700">
+                                                  {p.sellerName || '-'}
+                                                </td>
+                                                <td className="py-1.5 px-3 font-mono text-slate-600">
+                                                  {p.contractDate || '-'}
+                                                </td>
+                                                <td className="py-1.5 px-3 text-right font-mono text-slate-400">
+                                                  ¥0
+                                                </td>
+                                                <td className="py-1.5 px-3 no-print">
+                                                  {renderPurchaseAttsOnce()}
                                                 </td>
                                               </tr>
                                             )}
@@ -530,6 +600,17 @@ export const PropertyTableView: React.FC<PropertyTableViewProps> = ({
                                             }`}
                                           >
                                             {formatCurrency(cost.amount)}
+                                          </td>
+                                          <td className="py-1.5 px-3 text-slate-400 no-print">
+                                            {cost.attachments && cost.attachments.length > 0 ? (
+                                              <AttachmentBadgeList
+                                                compact
+                                                attachments={cost.attachments}
+                                                contextLabel={`付随費用: ${cost.costType} (${cost.payee || '-'})`}
+                                              />
+                                            ) : (
+                                              '-'
+                                            )}
                                           </td>
                                         </tr>
                                       );
@@ -613,6 +694,19 @@ export const PropertyTableView: React.FC<PropertyTableViewProps> = ({
                                         {sTax.total > 0 && (
                                           <div className="text-[10px] text-slate-500 font-mono px-1">
                                             内 固定資産税等精算金: {formatCurrency(sTax.total)}
+                                          </div>
+                                        )}
+                                        {sale.attachments && sale.attachments.length > 0 && (
+                                          <div className="pt-0.5 flex flex-wrap items-center gap-1.5 no-print">
+                                            <span className="text-[10px] font-bold text-slate-500 flex items-center space-x-0.5">
+                                              <Paperclip className="w-3 h-3 text-blue-600" />
+                                              <span>添付書類:</span>
+                                            </span>
+                                            <AttachmentBadgeList
+                                              compact
+                                              attachments={sale.attachments}
+                                              contextLabel={`売上 #${sIdx + 1} (${sale.buyerName || '-'} 様)`}
+                                            />
                                           </div>
                                         )}
                                       </div>

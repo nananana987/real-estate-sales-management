@@ -49,6 +49,84 @@ export function saveCompanyInfo(company: CompanyInfo): void {
   }
 }
 
+const DATA_IDB_NAME = 're_sales_mgmt_data_db_v1';
+const DATA_IDB_STORE = 'app_state';
+const DATA_IDB_PROPERTIES_KEY = 'properties_full_v2';
+
+function openDataIDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') {
+      return reject(new Error('IndexedDB not supported'));
+    }
+    const req = indexedDB.open(DATA_IDB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(DATA_IDB_STORE)) {
+        db.createObjectStore(DATA_IDB_STORE);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function savePropertiesToIDB(properties: Property[]): Promise<void> {
+  try {
+    const db = await openDataIDB();
+    const tx = db.transaction(DATA_IDB_STORE, 'readwrite');
+    const store = tx.objectStore(DATA_IDB_STORE);
+    store.put(properties, DATA_IDB_PROPERTIES_KEY);
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('IndexedDBへの物件データ保存スキップ:', err);
+  }
+}
+
+export async function loadPropertiesAsync(): Promise<Property[] | null> {
+  try {
+    const db = await openDataIDB();
+    const tx = db.transaction(DATA_IDB_STORE, 'readonly');
+    const store = tx.objectStore(DATA_IDB_STORE);
+    const req = store.get(DATA_IDB_PROPERTIES_KEY);
+    return await new Promise(resolve => {
+      tx.oncomplete = () => {
+        if (Array.isArray(req.result)) {
+          resolve(req.result as Property[]);
+        } else {
+          resolve(null);
+        }
+      };
+      tx.onerror = () => resolve(null);
+    });
+  } catch {
+    return null;
+  }
+}
+
+function stripAttachmentDataUrlsForLocalStorage(properties: Property[]): Property[] {
+  const stripList = (list?: any[]) =>
+    list?.map(a => ({ ...a, dataUrl: '' }));
+  return properties.map(p => ({
+    ...p,
+    attachments: stripList(p.attachments),
+    purchases: p.purchases?.map(pr => ({
+      ...pr,
+      attachments: stripList(pr.attachments),
+    })),
+    incidentalCosts: (p.incidentalCosts || []).map(c => ({
+      ...c,
+      attachments: stripList(c.attachments),
+    })),
+    sales: (p.sales || []).map(s => ({
+      ...s,
+      attachments: stripList(s.attachments),
+    })),
+  }));
+}
+
 export function loadProperties(): Property[] {
   ensureSampleCleaned();
   try {
@@ -65,10 +143,18 @@ export function loadProperties(): Property[] {
 }
 
 export function saveProperties(properties: Property[]): void {
+  // 添付ファイル(PDF・画像)を含む大容量データは常にIndexedDBにも保存
+  void savePropertiesToIDB(properties);
   try {
     localStorage.setItem(PROPERTIES_KEY, JSON.stringify(properties));
   } catch (err) {
-    console.error('Failed to save properties to localStorage', err);
+    // localStorageの容量上限(約5MB)に達した場合はメタデータのみlocalStorageに保存し、実体はIndexedDBで保持
+    try {
+      const stripped = stripAttachmentDataUrlsForLocalStorage(properties);
+      localStorage.setItem(PROPERTIES_KEY, JSON.stringify(stripped));
+    } catch (innerErr) {
+      console.error('Failed to save properties to localStorage', innerErr);
+    }
   }
 }
 

@@ -30,6 +30,29 @@ export type IncidentalCostType =
   | 'その他'
   | (string & {});
 
+export type AttachmentDocType =
+  | '売買契約書'
+  | '重要事項説明書'
+  | '決済精算書'
+  | '請求書'
+  | '領収書'
+  | '見積書'
+  | '公図・測量図'
+  | '全部事項証明書(謄本)'
+  | '案内図・物件資料'
+  | 'その他'
+  | (string & {});
+
+export interface AttachmentFile {
+  id: string;
+  name: string; // 元ファイル名 (例: "売買契約書_26001.pdf")
+  docType?: AttachmentDocType; // 書類種別ラベル (例: "売買契約書", "請求書", "公図・測量図")
+  mimeType: string; // MIMEタイプ ("application/pdf", "image/jpeg", "image/png" 等)
+  size: number; // ファイルサイズ (bytes)
+  dataUrl: string; // Base64 Data URL
+  createdAt: string; // 添付日時 (ISO文字列)
+}
+
 export interface IncidentalCost {
   id: string;
   propertyId: string;
@@ -39,6 +62,7 @@ export interface IncidentalCost {
   paymentDate: string; // 支払日 (YYYY-MM-DD)
   amount: number; // 金額
   memo?: string; // 備考
+  attachments?: AttachmentFile[]; // 請求書・領収書等の添付ファイル(複数可)
 }
 
 export type SaleCategory = 'full' | 'partial';
@@ -67,6 +91,7 @@ export interface SaleRecord {
   costOfGoodsSold: number; // 計上売上原価 (一部売却時の按分原価または完売時の原価)
   costCalculationNote?: string; // 売上原価の計算プロセス・根拠メモ
   memo?: string;
+  attachments?: AttachmentFile[]; // 売却契約書・精算書等の添付ファイル(複数可)
 }
 
 export interface PurchaseRecord {
@@ -90,6 +115,7 @@ export interface PurchaseRecord {
   fixedAssetTaxSettlementBuildingTax?: number; // 固定資産税等精算金 (建物消費税)
   fixedAssetTaxSettlement?: number; // 固定資産税等精算金 合計
   memo?: string; // 備考
+  attachments?: AttachmentFile[]; // 仕入契約書・重説・精算書等の添付ファイル(複数可)
 }
 
 export interface Property {
@@ -129,6 +155,9 @@ export interface Property {
   // 関連データ
   incidentalCosts: IncidentalCost[];
   sales: SaleRecord[];
+
+  // 物件基本資料の添付ファイル (公図・測量図・謄本・案内図等、複数可)
+  attachments?: AttachmentFile[];
 
   // 補足メモ
   notes?: string;

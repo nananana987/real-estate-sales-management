@@ -23,6 +23,7 @@ import {
   SaleCategory,
   PurchaseRecord,
   FiscalYear,
+  AttachmentFile,
 } from '../types';
 import {
   formatCurrency,
@@ -32,6 +33,8 @@ import {
 import { generateNextPropertyCode } from '../utils/codeGenerator';
 import { DateInput } from './DateInput';
 import { ResizableModal } from './ResizableModal';
+import { AttachmentManager } from './AttachmentManager';
+import { Paperclip } from 'lucide-react';
 
 interface PropertyFormModalProps {
   isOpen: boolean;
@@ -99,6 +102,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
   const [initialInventoryCost, setInitialInventoryCost] = useState<number | ''>('');
   const [initialInventoryNote, setInitialInventoryNote] = useState('');
   const [notes, setNotes] = useState('');
+  const [propertyAttachments, setPropertyAttachments] = useState<AttachmentFile[]>([]);
 
   // Incidental Costs List
   const [incidentalCosts, setIncidentalCosts] = useState<IncidentalCost[]>([]);
@@ -111,6 +115,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
   const [newCostPaymentDate, setNewCostPaymentDate] = useState('');
   const [newCostAmount, setNewCostAmount] = useState<string>('');
   const [newCostMemo, setNewCostMemo] = useState('');
+  const [newCostAttachments, setNewCostAttachments] = useState<AttachmentFile[]>([]);
 
   // Sales Records List
   const [sales, setSales] = useState<SaleRecord[]>([]);
@@ -164,6 +169,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
       setInitialInventoryCost(editingProperty.initialInventoryCost || 0);
       setInitialInventoryNote(editingProperty.initialInventoryNote || '');
       setNotes(editingProperty.notes || '');
+      setPropertyAttachments(editingProperty.attachments || []);
 
       setIncidentalCosts(editingProperty.incidentalCosts || []);
 
@@ -208,6 +214,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
           fixedAssetTaxSettlementBuildingTax: 0,
           fixedAssetTaxSettlement: 0,
           memo: '',
+          attachments: [],
         },
       ]);
 
@@ -215,6 +222,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
       setInitialInventoryCost('');
       setInitialInventoryNote('');
       setNotes('');
+      setPropertyAttachments([]);
 
       setIncidentalCosts([]);
       setSales([]);
@@ -225,6 +233,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
     setNewCostPaymentDate('');
     setNewCostAmount('');
     setNewCostMemo('');
+    setNewCostAttachments([]);
     setActiveTab(initialTab || 'purchase');
     setEditingSaleIndex(null);
   }, [editingProperty, isOpen, existingProperties, initialTab]);
@@ -373,6 +382,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
     setNewCostPaymentDate(cost.paymentDate || '');
     setNewCostAmount(cost.amount !== undefined && cost.amount !== null ? String(cost.amount) : '');
     setNewCostMemo(cost.memo || '');
+    setNewCostAttachments(cost.attachments || []);
   };
 
   // Cancel Edit Incidental Cost
@@ -383,6 +393,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
     setNewCostPaymentDate('');
     setNewCostAmount('');
     setNewCostMemo('');
+    setNewCostAttachments([]);
   };
 
   // Add or Update Incidental Cost
@@ -414,6 +425,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
             paymentDate: (newCostPaymentDate || '').trim(),
             amount: parsedAmount,
             memo: newCostMemo,
+            attachments: newCostAttachments.length > 0 ? newCostAttachments : undefined,
           };
         }
         return c;
@@ -430,12 +442,14 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
         paymentDate: (newCostPaymentDate || '').trim(),
         amount: parsedAmount,
         memo: newCostMemo,
+        attachments: newCostAttachments.length > 0 ? newCostAttachments : undefined,
       };
       setIncidentalCosts([...incidentalCosts, newCost]);
       setNewCostPayee('');
       setNewCostAmount('');
       setNewCostPaymentDate('');
       setNewCostMemo('');
+      setNewCostAttachments([]);
     }
   };
 
@@ -443,6 +457,19 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
     setIncidentalCosts(prev =>
       prev.map(c => (c.id === costId ? { ...c, paymentDate: (paymentDate || '').trim() } : c))
     );
+  };
+
+  const handleQuickUpdateCostAttachments = (costId: string, updatedAtts: AttachmentFile[]) => {
+    setIncidentalCosts(prev =>
+      prev.map(c =>
+        c.id === costId
+          ? { ...c, attachments: updatedAtts.length > 0 ? updatedAtts : undefined }
+          : c
+      )
+    );
+    if (editingCostId === costId) {
+      setNewCostAttachments(updatedAtts);
+    }
   };
 
   const handleRemoveIncidentalCost = (id: string) => {
@@ -757,6 +784,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
       fiscalYearId: editingProperty?.fiscalYearId || currentFY.id,
       incidentalCosts,
       sales: cleanedSales,
+      attachments: propertyAttachments.length > 0 ? propertyAttachments : undefined,
       notes,
       createdAt: editingProperty?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -1141,6 +1169,24 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                     className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
+
+                {/* 物件全体の添付資料 (公図・測量図・謄本等) */}
+                <AttachmentManager
+                  attachments={propertyAttachments}
+                  onChange={setPropertyAttachments}
+                  title="物件基本資料の添付 (公図・測量図・謄本・案内図など)"
+                  description="物件全体に関わる公図、地積測量図、全部事項証明書(謄本)、物件資料等を複数添付可能"
+                  defaultDocType="公図・測量図"
+                  suggestedDocTypes={[
+                    '公図・測量図',
+                    '全部事項証明書(謄本)',
+                    '案内図・物件資料',
+                    '売買契約書',
+                    '重要事項説明書',
+                    'その他',
+                  ]}
+                  contextLabel={`物件 [${code}] ${location || ''} 基本資料`}
+                />
               </div>
 
               {/* 前期繰越設定 */}
@@ -1569,6 +1615,32 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                             <p className="text-[10px] text-slate-400 mt-0.5">決済日入力で仕入・棚卸に計上</p>
                           </div>
                         </div>
+
+                        {/* この仕入契約に対する添付書類 (複数添付可能) */}
+                        <AttachmentManager
+                          attachments={purchase.attachments || []}
+                          onChange={updatedAtts =>
+                            handleUpdatePurchaseField(
+                              pIdx,
+                              'attachments',
+                              updatedAtts.length > 0 ? updatedAtts : undefined
+                            )
+                          }
+                          title={`仕入情報 #${pIdx + 1}${purchase.label ? ` (${purchase.label})` : ''} の添付書類 (契約書・重説・精算書・領収書・公図等)`}
+                          description="1つの仕入に対して売買契約書・重説・決済精算書・領収書などを複数添付できます"
+                          defaultDocType="売買契約書"
+                          suggestedDocTypes={[
+                            '売買契約書',
+                            '重要事項説明書',
+                            '決済精算書',
+                            '領収書',
+                            '請求書',
+                            '公図・測量図',
+                            '全部事項証明書(謄本)',
+                            'その他',
+                          ]}
+                          contextLabel={`仕入情報 #${pIdx + 1} (${purchase.sellerName || '売主未入力'})`}
+                        />
                       </div>
                     </div>
                   );
@@ -1802,6 +1874,19 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                       </button>
                     )}
                   </div>
+
+                  {/* 仕入付随費用の請求書・領収書・見積書添付エリア */}
+                  <div className="md:col-span-4 pt-1">
+                    <AttachmentManager
+                      attachments={newCostAttachments}
+                      onChange={setNewCostAttachments}
+                      title="この付随費用の請求書・領収書・見積書を添付 (PDF / 画像・複数可)"
+                      description="請求書や領収書、工事見積書等を添付できます（追加後の一覧からも直接添付・プレビュー可能）"
+                      defaultDocType="請求書"
+                      suggestedDocTypes={['請求書', '領収書', '見積書', '売買契約書', 'その他']}
+                      contextLabel={`付随費用: ${newCostType || ''} (${newCostPayee || '支払先未入力'})`}
+                    />
+                  </div>
                 </form>
               </div>
 
@@ -1842,6 +1927,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                           <th className="py-2 px-3">支払先</th>
                           <th className="py-2 px-3">支払日 (未払時は直接入力可)</th>
                           <th className="py-2 px-3 text-right">金額 (円)</th>
+                          <th className="py-2 px-3">請求書・領収書 (添付)</th>
                           <th className="py-2 px-3">備考</th>
                           <th className="py-2 px-3 text-center w-20">操作</th>
                         </tr>
@@ -1900,6 +1986,15 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                                 }`}
                               >
                                 {formatCurrency(cost.amount)}
+                              </td>
+                              <td className="py-2 px-3">
+                                <AttachmentManager
+                                  compact
+                                  attachments={cost.attachments || []}
+                                  onChange={atts => handleQuickUpdateCostAttachments(cost.id, atts)}
+                                  defaultDocType="請求書"
+                                  contextLabel={`付随費用: ${cost.costType} (${cost.payee || '-'})`}
+                                />
                               </td>
                               <td className="py-2 px-3 text-slate-500 text-[11px] truncate max-w-xs">
                                 {cost.memo || '-'}
@@ -2015,6 +2110,12 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                               {sale.saleCategory === 'full' && (
                                 <span className="ml-1.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
                                   全部売却 (一括完売)
+                                </span>
+                              )}
+                              {sale.attachments && sale.attachments.length > 0 && (
+                                <span className="ml-1.5 inline-flex items-center space-x-0.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                  <Paperclip className="w-2.5 h-2.5" />
+                                  <span>添付 {sale.attachments.length}件</span>
                                 </span>
                               )}
                             </div>
@@ -2459,6 +2560,31 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                                 </div>
                               </div>
                             </div>
+
+                            {/* 売上レコードの添付書類 (売買契約書・重説・決済精算書・領収書等、複数可) */}
+                            <AttachmentManager
+                              attachments={sale.attachments || []}
+                              onChange={updatedAtts =>
+                                handleUpdateSaleField(
+                                  index,
+                                  'attachments',
+                                  updatedAtts.length > 0 ? updatedAtts : undefined
+                                )
+                              }
+                              title={`売上 #${index + 1} (${sale.buyerName || '買主未入力'}) の添付書類 (売買契約書・重説・決済精算書等)`}
+                              description="売却時の売買契約書、重要事項説明書、決済精算書、領収書等を複数添付できます"
+                              defaultDocType="売買契約書"
+                              suggestedDocTypes={[
+                                '売買契約書',
+                                '重要事項説明書',
+                                '決済精算書',
+                                '領収書',
+                                '請求書',
+                                '公図・測量図',
+                                'その他',
+                              ]}
+                              contextLabel={`売上 #${index + 1} (${sale.buyerName || '買主未入力'})`}
+                            />
                           </div>
                         )}
                       </div>

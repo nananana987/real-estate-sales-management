@@ -214,6 +214,26 @@ export function getPropertyPurchases(property: Property): PurchaseRecord[] {
 }
 
 /**
+ * 物件に紐づく全ての添付ファイル（物件全体・各仕入・各付随費用・各売上）の総件数を取得
+ */
+export function getPropertyTotalAttachmentsCount(property: Property): number {
+  const propCount = property.attachments?.length || 0;
+  const purchasesCount = (property.purchases || []).reduce(
+    (sum, p) => sum + (p.attachments?.length || 0),
+    0
+  );
+  const costsCount = (property.incidentalCosts || []).reduce(
+    (sum, c) => sum + (c.attachments?.length || 0),
+    0
+  );
+  const salesCount = (property.sales || []).reduce(
+    (sum, s) => sum + (s.attachments?.length || 0),
+    0
+  );
+  return propCount + purchasesCount + costsCount + salesCount;
+}
+
+/**
  * 固定資産税等精算金の合計を取得 (全仕入レコードの合算)
  */
 export function getPurchaseFixedAssetTax(property: Property): { land: number; building: number; buildingTax: number; total: number } {

@@ -15,6 +15,7 @@ import {
 import { Property, FiscalYear, CompanyInfo, PropertyStatus } from './types';
 import {
   loadProperties,
+  loadPropertiesAsync,
   saveProperties,
   loadFiscalYears,
   saveFiscalYears,
@@ -56,6 +57,22 @@ export default function App() {
   const [selectedFYId, setSelectedFYId] = useState<string>(() => loadSelectedFiscalYearId());
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(() => loadCompanyInfo());
   const [isLocalFileManagerOpen, setIsLocalFileManagerOpen] = useState(false);
+
+  // Hydrate full properties (including large PDF/image attachments) from IndexedDB on startup
+  useEffect(() => {
+    let mounted = true;
+    loadPropertiesAsync().then(idbProps => {
+      if (mounted && idbProps && idbProps.length > 0) {
+        setProperties(prev => {
+          // Only hydrate if IDB has matching or newer attachment data
+          return idbProps;
+        });
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Callback when data is restored or loaded from PC local file
   const handleDataLoadedFromFile = React.useCallback((data: AppDataFile) => {
@@ -291,6 +308,25 @@ export default function App() {
               c.customCostTypeName?.toLowerCase().includes(q) ||
               c.memo?.toLowerCase().includes(q)
           );
+          const matchAttachments =
+            (property.attachments || []).some(
+              a => a.name?.toLowerCase().includes(q) || a.docType?.toLowerCase().includes(q)
+            ) ||
+            (property.purchases || []).some(p =>
+              (p.attachments || []).some(
+                a => a.name?.toLowerCase().includes(q) || a.docType?.toLowerCase().includes(q)
+              )
+            ) ||
+            (property.incidentalCosts || []).some(c =>
+              (c.attachments || []).some(
+                a => a.name?.toLowerCase().includes(q) || a.docType?.toLowerCase().includes(q)
+              )
+            ) ||
+            (property.sales || []).some(s =>
+              (s.attachments || []).some(
+                a => a.name?.toLowerCase().includes(q) || a.docType?.toLowerCase().includes(q)
+              )
+            );
           if (
             !matchCode &&
             !matchName &&
@@ -298,7 +334,8 @@ export default function App() {
             !matchSeller &&
             !matchLandCategory &&
             !matchBuyer &&
-            !matchIncidentalPayee
+            !matchIncidentalPayee &&
+            !matchAttachments
           ) {
             return false;
           }

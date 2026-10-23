@@ -19,8 +19,11 @@ import {
   getStatusBadgeClass,
   getPropertyPurchases,
   getPurchaseRecordFixedAssetTax,
+  getPropertyTotalAttachmentsCount,
 } from '../utils/calculations';
 import { ResizableModal } from './ResizableModal';
+import { AttachmentBadgeList } from './AttachmentManager';
+import { Paperclip } from 'lucide-react';
 
 interface PropertyDetailModalProps {
   property: Property | null;
@@ -55,6 +58,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   const landArea = formatArea(property.landArea);
   const buildingArea = property.buildingArea ? formatArea(property.buildingArea) : null;
   const purchases = getPropertyPurchases(property);
+  const totalAttachmentsCount = getPropertyTotalAttachmentsCount(property);
 
   const handlePrint = () => {
     window.print();
@@ -79,11 +83,17 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 <Building className="w-4 h-4" />
               </div>
               <div>
-                <div className="flex items-center space-x-1.5">
+                <div className="flex items-center space-x-1.5 flex-wrap">
                   <span className="font-mono text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 font-bold">
                     {property.code}
                   </span>
                   <h2 className="text-sm font-bold tracking-tight text-slate-900">{property.location}</h2>
+                  {totalAttachmentsCount > 0 && (
+                    <span className="inline-flex items-center space-x-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                      <Paperclip className="w-2.5 h-2.5 text-blue-600" />
+                      <span>添付書類 {totalAttachmentsCount}件</span>
+                    </span>
+                  )}
                 </div>
                 {property.name && property.name !== property.location && (
                   <p className="text-[11px] text-slate-400 font-medium">{property.name}</p>
@@ -214,6 +224,19 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 </span>
               </div>
             </div>
+
+            {property.attachments && property.attachments.length > 0 && (
+              <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-bold text-slate-600 flex items-center space-x-1 mr-1">
+                  <Paperclip className="w-3 h-3 text-blue-600" />
+                  <span>物件基本資料:</span>
+                </span>
+                <AttachmentBadgeList
+                  attachments={property.attachments}
+                  contextLabel={`物件 [${property.code}] ${property.location} 基本資料`}
+                />
+              </div>
+            )}
           </div>
 
           {/* 仕入・原価内訳明細 */}
@@ -233,7 +256,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                   <th className="py-1.5 px-3">相手先 (支払先)</th>
                   <th className="py-1.5 px-3">支払日 / 決済日</th>
                   <th className="py-1.5 px-3 text-right">金額 (円)</th>
-                  <th className="py-1.5 px-3">備考</th>
+                  <th className="py-1.5 px-3">備考・添付書類</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -246,6 +269,22 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                         ? `[${p.label}] `
                         : `[仕入#${idx + 1}] `
                       : '';
+                  const hasPurchaseAtts = p.attachments && p.attachments.length > 0;
+                  let renderedAtts = false;
+                  const renderPurchaseAttsOnce = () => {
+                    if (renderedAtts || !hasPurchaseAtts) return null;
+                    renderedAtts = true;
+                    return (
+                      <div className="mt-1">
+                        <AttachmentBadgeList
+                          compact
+                          attachments={p.attachments}
+                          contextLabel={`${prefix || '仕入契約'} (${p.sellerName || '-'})`}
+                        />
+                      </div>
+                    );
+                  };
+
                   return (
                     <React.Fragment key={p.id || idx}>
                       {(p.landPurchasePrice || 0) > 0 && (
@@ -263,7 +302,10 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                           <td className="py-1.5 px-3 text-right font-mono font-bold">
                             {formatCurrency(p.landPurchasePrice)}
                           </td>
-                          <td className="py-1.5 px-3 text-slate-500">非課税</td>
+                          <td className="py-1.5 px-3 text-slate-500">
+                            <div>非課税</div>
+                            {renderPurchaseAttsOnce()}
+                          </td>
                         </tr>
                       )}
                       {bldgGross > 0 && (
@@ -281,7 +323,10 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                           <td className="py-1.5 px-3 text-right font-mono font-bold">
                             {formatCurrency(bldgGross)}
                           </td>
-                          <td className="py-1.5 px-3 text-slate-500">消費税込/本体</td>
+                          <td className="py-1.5 px-3 text-slate-500">
+                            <div>消費税込/本体</div>
+                            {renderPurchaseAttsOnce()}
+                          </td>
                         </tr>
                       )}
                       {pTax.total > 0 && (
@@ -298,7 +343,23 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                           <td className="py-1.5 px-3 text-right font-mono font-bold">
                             {formatCurrency(pTax.total)}
                           </td>
-                          <td className="py-1.5 px-3 text-slate-500">仕入原価算入</td>
+                          <td className="py-1.5 px-3 text-slate-500">
+                            <div>仕入原価算入</div>
+                            {renderPurchaseAttsOnce()}
+                          </td>
+                        </tr>
+                      )}
+                      {!renderedAtts && hasPurchaseAtts && (
+                        <tr className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-1.5 px-3 font-bold text-slate-800">
+                            {prefix}仕入契約書類
+                          </td>
+                          <td className="py-1.5 px-3">{p.sellerName || '-'}</td>
+                          <td className="py-1.5 px-3 font-mono">{p.contractDate || '-'}</td>
+                          <td className="py-1.5 px-3 text-right font-mono text-slate-400">¥0</td>
+                          <td className="py-1.5 px-3">
+                            {renderPurchaseAttsOnce()}
+                          </td>
                         </tr>
                       )}
                     </React.Fragment>
@@ -326,15 +387,28 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                           cost.paymentDate
                         )}
                       </td>
-                    <td
-                      className={`py-1.5 px-3 text-right font-mono font-bold ${
-                        cost.amount < 0 ? 'text-red-600' : 'text-blue-700'
-                      }`}
-                    >
-                      {formatCurrency(cost.amount)}
-                    </td>
-                    <td className="py-1.5 px-3 text-slate-500">{cost.memo || '-'}</td>
-                  </tr>
+                      <td
+                        className={`py-1.5 px-3 text-right font-mono font-bold ${
+                          cost.amount < 0 ? 'text-red-600' : 'text-blue-700'
+                        }`}
+                      >
+                        {formatCurrency(cost.amount)}
+                      </td>
+                      <td className="py-1.5 px-3 text-slate-500">
+                        {cost.memo && <div>{cost.memo}</div>}
+                        {cost.attachments && cost.attachments.length > 0 ? (
+                          <div className={cost.memo ? 'mt-1' : ''}>
+                            <AttachmentBadgeList
+                              compact
+                              attachments={cost.attachments}
+                              contextLabel={`付随費用: ${cost.costType} (${cost.payee || '-'})`}
+                            />
+                          </div>
+                        ) : (
+                          !cost.memo && '-'
+                        )}
+                      </td>
+                    </tr>
                   );
                 })}
               </tbody>
@@ -404,6 +478,20 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                           原価計算根拠・按分プロセス:
                         </strong>
                         {sale.costCalculationNote}
+                      </div>
+                    )}
+
+                    {sale.attachments && sale.attachments.length > 0 && (
+                      <div className="pt-1 flex flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-slate-500 flex items-center space-x-0.5">
+                          <Paperclip className="w-3 h-3 text-blue-600" />
+                          <span>売上添付書類:</span>
+                        </span>
+                        <AttachmentBadgeList
+                          compact
+                          attachments={sale.attachments}
+                          contextLabel={`売上 #${sIdx + 1} (${sale.buyerName || '-'} 様)`}
+                        />
                       </div>
                     )}
                   </div>
