@@ -1133,8 +1133,8 @@ export function parseSalesCsv(
     const fixedAssetTaxSettlement =
       fixedAssetTaxSettlementLand + fixedAssetTaxSettlementBuilding;
 
-    if (landPrice <= 0 && buildingPrice <= 0) {
-      warnings.push('土地売上金額と建物売上金額がともに0円です');
+    if (landPrice === 0 && buildingPrice === 0) {
+      warnings.push('売上金額0円（無償譲渡・帰属等）として登録します');
     }
 
     if (!buyerName) {

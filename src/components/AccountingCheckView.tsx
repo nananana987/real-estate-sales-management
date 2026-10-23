@@ -172,7 +172,7 @@ export const AccountingCheckView: React.FC<AccountingCheckViewProps> = ({
             propertyCode: prop.code,
             propertyName: prop.location,
             accountType: '土地売上',
-            buyer: sale.buyerName,
+            buyer: sale.buyerName || '-',
             amount: landTotal,
             memo: `${sale.partialSaleName ? `[${sale.partialSaleName}] ` : ''}${sTaxLand > 0 || legacyTax > 0 ? '土地精算金含む' : ''}`,
             cogs: sale.costOfGoodsSold || 0,
@@ -185,10 +185,24 @@ export const AccountingCheckView: React.FC<AccountingCheckViewProps> = ({
             propertyCode: prop.code,
             propertyName: prop.location,
             accountType: '建物売上',
-            buyer: sale.buyerName,
+            buyer: sale.buyerName || '-',
             amount: bldgTotal,
             memo: `${sale.partialSaleName ? `[${sale.partialSaleName}] ` : ''}${sTaxBldg > 0 ? '建物精算金含む' : '建物売上'}`,
-            cogs: 0,
+            cogs: landTotal > 0 ? 0 : (sale.costOfGoodsSold || 0),
+            property: prop,
+          });
+        }
+        if (landTotal === 0 && bldgTotal === 0) {
+          const isBuildingOnly = sale.saleType === 'building' || prop.propertyType === 'building';
+          salesItems.push({
+            date: sale.settlementDate!,
+            propertyCode: prop.code,
+            propertyName: prop.location,
+            accountType: isBuildingOnly ? '建物売上' : '土地売上',
+            buyer: sale.buyerName || '-',
+            amount: 0,
+            memo: `${sale.partialSaleName ? `[${sale.partialSaleName}] ` : ''}0円売上${sale.memo ? ` (${sale.memo})` : ''}`,
+            cogs: sale.costOfGoodsSold || 0,
             property: prop,
           });
         }

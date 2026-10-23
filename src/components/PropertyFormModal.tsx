@@ -698,6 +698,37 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
         ? Math.round(purchasesBldgAreaSum * 100) / 100
         : 0;
 
+    const cleanedSales: SaleRecord[] = sales.map((s, idx) => {
+      const sTaxLand = Number(s.fixedAssetTaxSettlementLand) || 0;
+      const sTaxBldg = Number(s.fixedAssetTaxSettlementBuilding) || 0;
+      return {
+        ...s,
+        id: s.id || `sale-${Date.now()}-${idx}`,
+        propertyId: propId,
+        buyerName: (s.buyerName || '').trim(),
+        buyerAddress: (s.buyerAddress || '').trim(),
+        soldLandArea:
+          s.soldLandArea !== undefined && s.soldLandArea !== null && (s.soldLandArea as any) !== ''
+            ? Number(s.soldLandArea)
+            : 0,
+        soldBuildingArea:
+          s.soldBuildingArea !== undefined &&
+          s.soldBuildingArea !== null &&
+          (s.soldBuildingArea as any) !== ''
+            ? Number(s.soldBuildingArea)
+            : 0,
+        landPrice: Number(s.landPrice) || 0,
+        buildingPrice: Number(s.buildingPrice) || 0,
+        buildingTax: 0,
+        depositAmount: Number(s.depositAmount) || 0,
+        fixedAssetTaxSettlementLand: sTaxLand,
+        fixedAssetTaxSettlementBuilding: sTaxBldg,
+        fixedAssetTaxSettlementBuildingTax: 0,
+        fixedAssetTaxSettlement: sTaxLand + sTaxBldg,
+        costOfGoodsSold: Number(s.costOfGoodsSold) || 0,
+      };
+    });
+
     const newProperty: Property = {
       id: propId,
       code: cleanCode,
@@ -725,7 +756,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
       initialInventoryNote: isCarriedOver ? initialInventoryNote : undefined,
       fiscalYearId: editingProperty?.fiscalYearId || currentFY.id,
       incidentalCosts,
-      sales,
+      sales: cleanedSales,
       notes,
       createdAt: editingProperty?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -2136,12 +2167,29 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                               </div>
 
                               <div>
-                                <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
-                                  土地売上金額 (円・非課税)
-                                </label>
+                                <div className="flex items-center justify-between mb-0.5">
+                                  <label className="block text-[11px] font-semibold text-slate-700">
+                                    土地売上金額 (円・非課税)
+                                  </label>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateSaleField(index, 'landPrice', 0)}
+                                    className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300 font-mono cursor-pointer transition-colors"
+                                    title="0円をセット"
+                                  >
+                                    0円
+                                  </button>
+                                </div>
                                 <input
                                   type="number"
-                                  value={sale.landPrice || ''}
+                                  min="0"
+                                  value={
+                                    sale.landPrice !== undefined &&
+                                    sale.landPrice !== null &&
+                                    (sale.landPrice as any) !== ''
+                                      ? sale.landPrice
+                                      : ''
+                                  }
                                   onChange={e =>
                                     handleUpdateSaleField(
                                       index,
@@ -2149,21 +2197,38 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                                       e.target.value === '' ? '' : parseFloat(e.target.value)
                                     )
                                   }
-                                  placeholder="例: 58000000"
+                                  placeholder="例: 58000000 (0円も登録可)"
                                   className="w-full px-2 py-1 text-xs bg-white border border-slate-200 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-500 font-mono"
                                 />
                                 <p className="text-[10px] text-slate-500 mt-0.5 font-mono">
-                                  {formatCurrency(sale.landPrice)}
+                                  {formatCurrency(Number(sale.landPrice) || 0)}
                                 </p>
                               </div>
 
                               <div>
-                                <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
-                                  建物売上金額 (円・税込)
-                                </label>
+                                <div className="flex items-center justify-between mb-0.5">
+                                  <label className="block text-[11px] font-semibold text-slate-700">
+                                    建物売上金額 (円・税込)
+                                  </label>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateSaleField(index, 'buildingPrice', 0)}
+                                    className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300 font-mono cursor-pointer transition-colors"
+                                    title="0円をセット"
+                                  >
+                                    0円
+                                  </button>
+                                </div>
                                 <input
                                   type="number"
-                                  value={sale.buildingPrice || ''}
+                                  min="0"
+                                  value={
+                                    sale.buildingPrice !== undefined &&
+                                    sale.buildingPrice !== null &&
+                                    (sale.buildingPrice as any) !== ''
+                                      ? sale.buildingPrice
+                                      : ''
+                                  }
                                   onChange={e =>
                                     handleUpdateSaleField(
                                       index,
@@ -2171,11 +2236,11 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                                       e.target.value === '' ? '' : parseFloat(e.target.value)
                                     )
                                   }
-                                  placeholder="例: 0"
+                                  placeholder="例: 0 (0円も登録可)"
                                   className="w-full px-2 py-1 text-xs bg-white border border-slate-200 rounded focus:outline-hidden focus:ring-1 focus:ring-blue-500 font-mono"
                                 />
                                 <p className="text-[10px] text-slate-500 mt-0.5 font-mono">
-                                  {formatCurrency(sale.buildingPrice)}
+                                  {formatCurrency(Number(sale.buildingPrice) || 0)}
                                 </p>
                               </div>
                             </div>
@@ -2195,7 +2260,13 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                                   </label>
                                   <input
                                     type="number"
-                                    value={sale.fixedAssetTaxSettlementLand || ''}
+                                    value={
+                                      sale.fixedAssetTaxSettlementLand !== undefined &&
+                                      sale.fixedAssetTaxSettlementLand !== null &&
+                                      (sale.fixedAssetTaxSettlementLand as any) !== ''
+                                        ? sale.fixedAssetTaxSettlementLand
+                                        : ''
+                                    }
                                     onChange={e =>
                                       handleUpdateSaleField(
                                         index,
@@ -2213,7 +2284,13 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                                   </label>
                                   <input
                                     type="number"
-                                    value={sale.fixedAssetTaxSettlementBuilding || ''}
+                                    value={
+                                      sale.fixedAssetTaxSettlementBuilding !== undefined &&
+                                      sale.fixedAssetTaxSettlementBuilding !== null &&
+                                      (sale.fixedAssetTaxSettlementBuilding as any) !== ''
+                                        ? sale.fixedAssetTaxSettlementBuilding
+                                        : ''
+                                    }
                                     onChange={e =>
                                       handleUpdateSaleField(
                                         index,
@@ -2236,7 +2313,13 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                                 </label>
                                 <input
                                   type="number"
-                                  value={sale.depositAmount || ''}
+                                  value={
+                                    sale.depositAmount !== undefined &&
+                                    sale.depositAmount !== null &&
+                                    (sale.depositAmount as any) !== ''
+                                      ? sale.depositAmount
+                                      : ''
+                                  }
                                   onChange={e =>
                                     handleUpdateSaleField(
                                       index,
@@ -2313,12 +2396,29 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
 
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 items-start">
                                 <div>
-                                  <label className="block text-[11px] font-bold text-slate-800 mb-0.5">
-                                    計上売上原価 (円) <span className="text-red-500">*</span>
-                                  </label>
+                                  <div className="flex items-center justify-between mb-0.5">
+                                    <label className="block text-[11px] font-bold text-slate-800">
+                                      計上売上原価 (円) <span className="text-red-500">*</span>
+                                    </label>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateSaleField(index, 'costOfGoodsSold', 0)}
+                                      className="text-[10px] px-1.5 py-0.2 rounded bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 font-mono cursor-pointer transition-colors"
+                                      title="売上原価を0円にセット"
+                                    >
+                                      0円
+                                    </button>
+                                  </div>
                                   <input
                                     type="number"
-                                    value={sale.costOfGoodsSold || ''}
+                                    min="0"
+                                    value={
+                                      sale.costOfGoodsSold !== undefined &&
+                                      sale.costOfGoodsSold !== null &&
+                                      (sale.costOfGoodsSold as any) !== ''
+                                        ? sale.costOfGoodsSold
+                                        : ''
+                                    }
                                     onChange={e =>
                                       handleUpdateSaleField(
                                         index,
@@ -2326,12 +2426,12 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                                         e.target.value === '' ? '' : parseFloat(e.target.value)
                                       )
                                     }
-                                    placeholder="例: 44042000"
+                                    placeholder="例: 44042000 (0円も可)"
                                     className="w-full px-2 py-1 text-xs bg-white border border-amber-300 rounded focus:outline-hidden focus:ring-1 focus:ring-amber-600 font-mono font-bold"
                                   />
                                   <div className="flex items-center justify-between text-[10px] text-amber-800 font-semibold mt-0.5 font-mono">
-                                    <span>原価: {formatCurrency(sale.costOfGoodsSold)}</span>
-                                    {sale.saleCategory === 'full' && sale.costOfGoodsSold !== calculateRemainingAcquisition(index) && (
+                                    <span>原価: {formatCurrency(Number(sale.costOfGoodsSold) || 0)}</span>
+                                    {sale.saleCategory === 'full' && Number(sale.costOfGoodsSold) !== calculateRemainingAcquisition(index) && (
                                       <button
                                         type="button"
                                         onClick={() => handleApplyFullSaleCOGS(index)}
