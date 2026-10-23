@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Maximize2, Minimize2, MoveDiagonal2, RotateCcw, Columns2 } from 'lucide-react';
 
 export interface ModalResizeControls {
@@ -15,6 +16,7 @@ export interface ModalResizeControls {
 interface ResizableModalProps {
   id?: string;
   backdropId?: string;
+  backdropClassName?: string;
   onBackdropClick?: () => void;
   defaultWidth?: number; // px (e.g., 896 for max-w-4xl)
   defaultHeight?: number; // px (optional)
@@ -30,6 +32,7 @@ type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 export const ResizableModal: React.FC<ResizableModalProps> = ({
   id,
   backdropId,
+  backdropClassName = 'z-50',
   onBackdropClick,
   defaultWidth = 896,
   defaultHeight,
@@ -273,11 +276,11 @@ export const ResizableModal: React.FC<ResizableModalProps> = ({
         maxHeight: '94vh',
       };
 
-  return (
+  const modalContent = (
     <div
       id={backdropId}
       onClick={onBackdropClick}
-      className={`fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center ${
+      className={`fixed inset-0 ${backdropClassName} overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center ${
         isMaximized ? 'p-2' : 'p-3'
       } ${onBackdropClick ? 'cursor-pointer' : ''} ${isDragging ? 'select-none' : ''}`}
     >
@@ -345,4 +348,9 @@ export const ResizableModal: React.FC<ResizableModalProps> = ({
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined') {
+    return createPortal(modalContent, document.body);
+  }
+  return modalContent;
 };

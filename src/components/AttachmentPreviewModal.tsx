@@ -136,17 +136,21 @@ export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
   return (
     <ResizableModal
       onBackdropClick={onClose}
+      backdropClassName="z-[80]"
       defaultWidth={960}
-      defaultHeight={760}
+      defaultHeight={
+        typeof window !== 'undefined'
+          ? Math.min(760, Math.max(480, Math.round(window.innerHeight * 0.88)))
+          : 720
+      }
       minWidth={480}
       minHeight={400}
       storageKey="attachment_preview_modal"
-      className="z-[70]"
     >
       {({ renderHeaderControls }) => (
-        <>
+        <div className="flex flex-col flex-1 min-h-0 h-full w-full overflow-hidden">
           {/* Header */}
-          <div className="px-4 py-2.5 bg-[#001529] text-white flex items-center justify-between gap-2">
+          <div className="shrink-0 relative z-20 px-4 py-2.5 bg-[#001529] border-b border-slate-700 text-white flex items-center justify-between gap-2">
             <div className="flex items-center space-x-2.5 min-w-0">
               <div
                 className={`w-7 h-7 rounded flex items-center justify-center shrink-0 border ${
@@ -284,7 +288,7 @@ export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
 
           {/* Thumbnail / Tab Strip when multiple attachments exist */}
           {attachmentsList.length > 1 && onSelectAttachment && (
-            <div className="bg-slate-100 border-b border-slate-200 px-3 py-1.5 flex items-center gap-1.5 overflow-x-auto shrink-0">
+            <div className="shrink-0 relative z-10 bg-slate-100 border-b border-slate-200 px-3 py-1.5 flex items-center gap-1.5 overflow-x-auto">
               {attachmentsList.map((item, idx) => {
                 const active = item.id === attachment.id;
                 const itemIsPdf =
@@ -323,22 +327,26 @@ export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
           )}
 
           {/* Main Preview Body */}
-          <div className="flex-1 bg-slate-800 overflow-auto flex items-center justify-center relative min-h-[420px]">
+          <div className="flex-1 min-h-0 w-full bg-slate-800 relative overflow-hidden flex flex-col">
             {!blobUrl ? (
-              <div className="text-center p-8 text-slate-300 space-y-3">
-                <FileText className="w-10 h-10 mx-auto text-slate-400" />
-                <p className="text-xs font-semibold">
-                  プレビューデータを読み込めませんでした
-                </p>
+              <div className="flex-1 flex items-center justify-center p-8">
+                <div className="text-center text-slate-300 space-y-3">
+                  <FileText className="w-10 h-10 mx-auto text-slate-400" />
+                  <p className="text-xs font-semibold">
+                    プレビューデータを読み込めませんでした
+                  </p>
+                </div>
               </div>
             ) : isPdf ? (
-              <iframe
-                src={blobUrl}
-                title={attachment.name}
-                className="w-full h-full min-h-[560px] border-0 bg-white"
-              />
+              <div className="flex-1 min-h-0 w-full flex flex-col bg-slate-200 pt-1">
+                <iframe
+                  src={blobUrl}
+                  title={attachment.name}
+                  className="w-full flex-1 h-full min-h-0 border-0 block bg-white"
+                />
+              </div>
             ) : isImage ? (
-              <div className="p-4 flex items-center justify-center min-h-full min-w-full overflow-auto">
+              <div className="flex-1 min-h-0 w-full p-4 flex items-center justify-center overflow-auto">
                 <img
                   src={blobUrl}
                   alt={attachment.name}
@@ -346,30 +354,32 @@ export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
                     transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
                     transformOrigin: 'center center',
                   }}
-                  className="max-w-full max-h-[75vh] object-contain rounded shadow-lg transition-transform duration-150 bg-white"
+                  className="max-w-full max-h-full object-contain rounded shadow-lg transition-transform duration-150 bg-white"
                 />
               </div>
             ) : (
-              <div className="bg-white p-6 rounded-lg shadow-md text-center space-y-3 max-w-sm">
-                <Paperclip className="w-8 h-8 text-blue-600 mx-auto" />
-                <div className="text-xs font-bold text-slate-800 break-all">
-                  {attachment.name}
+              <div className="flex-1 flex items-center justify-center p-6">
+                <div className="bg-white p-6 rounded-lg shadow-md text-center space-y-3 max-w-sm">
+                  <Paperclip className="w-8 h-8 text-blue-600 mx-auto" />
+                  <div className="text-xs font-bold text-slate-800 break-all">
+                    {attachment.name}
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    このファイル形式 ({attachment.mimeType || '不明'}) は直接表示できないため、保存してご確認ください。
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => downloadAttachmentFile(attachment)}
+                    className="px-4 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold inline-flex items-center space-x-1.5 cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>ファイルをダウンロード</span>
+                  </button>
                 </div>
-                <p className="text-[11px] text-slate-500">
-                  このファイル形式 ({attachment.mimeType || '不明'}) は直接表示できないため、保存してご確認ください。
-                </p>
-                <button
-                  type="button"
-                  onClick={() => downloadAttachmentFile(attachment)}
-                  className="px-4 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold inline-flex items-center space-x-1.5 cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>ファイルをダウンロード</span>
-                </button>
               </div>
             )}
           </div>
-        </>
+        </div>
       )}
     </ResizableModal>
   );
