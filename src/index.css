@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: "UD Digi Kyokasho N-R", "UD デジタル 教科書体 N-R", "BIZ UDGothic", sans-serif;
+  --font-mono: "UD Digi Kyokasho N-R", "UD デジタル 教科書体 N-R", "BIZ UDGothic", sans-serif;
+}
+
+html,
+body,
+button,
+input,
+select,
+textarea,
+.font-sans,
+.font-mono {
+  font-family: "UD Digi Kyokasho N-R", "UD デジタル 教科書体 N-R", "BIZ UDGothic", sans-serif;
+}
+
 @media print {
   /* Hide non-printable elements */
   .no-print,
