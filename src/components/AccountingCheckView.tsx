@@ -18,6 +18,8 @@ import {
   calculatePropertyFinancials,
   formatCurrency,
   isDateInFiscalYear,
+  getPropertyPurchases,
+  getPurchaseRecordFixedAssetTax,
 } from '../utils/calculations';
 import { downloadCSV } from '../utils/storage';
 
@@ -84,61 +86,69 @@ export const AccountingCheckView: React.FC<AccountingCheckViewProps> = ({
 
   properties.forEach(prop => {
     const fin = calculatePropertyFinancials(prop, currentFY);
+    const propPurchases = getPropertyPurchases(prop);
 
-    // 仕入本体 (当期決済)
-    if (isDateInFiscalYear(prop.settlementDate, currentFY)) {
-      if (prop.landPurchasePrice > 0) {
-        purchaseItems.push({
-          date: prop.settlementDate!,
-          propertyCode: prop.code,
-          propertyName: prop.name,
-          accountSubtype: '仕入 (土地本体)',
-          partner: prop.sellerName || '売主',
-          amount: prop.landPurchasePrice,
-          memo: `地目: ${prop.landCategory} / 面積: ${prop.landArea}㎡`,
-          property: prop,
-        });
-      }
-      if (prop.buildingPurchasePrice > 0) {
-        purchaseItems.push({
-          date: prop.settlementDate!,
-          propertyCode: prop.code,
-          propertyName: prop.name,
-          accountSubtype: '仕入 (建物本体)',
-          partner: prop.sellerName || '売主',
-          amount: prop.buildingPurchasePrice,
-          memo: `建物面積: ${prop.buildingArea || 0}㎡`,
-          property: prop,
-        });
-      }
-      const pTaxLand = fin.purchaseFixedAssetTaxLand;
-      const pTaxBldg = fin.purchaseFixedAssetTaxBuilding + fin.purchaseFixedAssetTaxBuildingTax;
+    // 仕入本体 (各仕入レコードのうち当期決済済みのもののみ)
+    propPurchases.forEach((p, pIdx) => {
+      if (isDateInFiscalYear(p.settlementDate, currentFY)) {
+        const pTax = getPurchaseRecordFixedAssetTax(p);
+        const bldgGross = (p.buildingPurchasePrice || 0) + (p.buildingPurchaseTax || 0);
+        const labelPrefix =
+          propPurchases.length > 1 ? (p.label ? `[${p.label}] ` : `[仕入#${pIdx + 1}] `) : '';
 
-      if (pTaxLand > 0) {
-        purchaseItems.push({
-          date: prop.settlementDate!,
-          propertyCode: prop.code,
-          propertyName: prop.location,
-          accountSubtype: '仕入 (固定資産税等精算金・土地分)',
-          partner: prop.sellerName || '売主',
-          amount: pTaxLand,
-          memo: '公租公課精算金 (非課税・仕入原価算入)',
-          property: prop,
-        });
+        if ((p.landPurchasePrice || 0) > 0) {
+          purchaseItems.push({
+            date: p.settlementDate!,
+            propertyCode: prop.code,
+            propertyName: prop.location || prop.name || '',
+            accountSubtype: `${labelPrefix}仕入 (土地本体)`,
+            partner: p.sellerName || prop.sellerName || '売主',
+            amount: p.landPurchasePrice,
+            memo: `地目: ${prop.landCategory} / 面積: ${p.landArea || prop.landArea}㎡`,
+            property: prop,
+          });
+        }
+        if (bldgGross > 0) {
+          purchaseItems.push({
+            date: p.settlementDate!,
+            propertyCode: prop.code,
+            propertyName: prop.location || prop.name || '',
+            accountSubtype: `${labelPrefix}仕入 (建物本体)`,
+            partner: p.sellerName || prop.sellerName || '売主',
+            amount: bldgGross,
+            memo: `建物面積: ${p.buildingArea || prop.buildingArea || 0}㎡`,
+            property: prop,
+          });
+        }
+        const pTaxLand = pTax.land;
+        const pTaxBldg = pTax.building + pTax.buildingTax;
+
+        if (pTaxLand > 0) {
+          purchaseItems.push({
+            date: p.settlementDate!,
+            propertyCode: prop.code,
+            propertyName: prop.location || prop.name || '',
+            accountSubtype: `${labelPrefix}仕入 (固定資産税等精算金・土地分)`,
+            partner: p.sellerName || prop.sellerName || '売主',
+            amount: pTaxLand,
+            memo: '公租公課精算金 (非課税・仕入原価算入)',
+            property: prop,
+          });
+        }
+        if (pTaxBldg > 0) {
+          purchaseItems.push({
+            date: p.settlementDate!,
+            propertyCode: prop.code,
+            propertyName: prop.location || prop.name || '',
+            accountSubtype: `${labelPrefix}仕入 (固定資産税等精算金・建物分)`,
+            partner: p.sellerName || prop.sellerName || '売主',
+            amount: pTaxBldg,
+            memo: '公租公課精算金 (課税・仕入原価算入)',
+            property: prop,
+          });
+        }
       }
-      if (pTaxBldg > 0) {
-        purchaseItems.push({
-          date: prop.settlementDate!,
-          propertyCode: prop.code,
-          propertyName: prop.location,
-          accountSubtype: '仕入 (固定資産税等精算金・建物分)',
-          partner: prop.sellerName || '売主',
-          amount: pTaxBldg,
-          memo: '公租公課精算金 (課税・仕入原価算入)',
-          property: prop,
-        });
-      }
-    }
+    });
 
     // 付随費用 (当期支払)
     (prop.incidentalCosts || []).forEach(cost => {

@@ -249,7 +249,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
         const purchaseLabel =
           propPurchases.length > 1 ? p.label || `仕入#${pIdx + 1}` : p.label || undefined;
 
-        const rowIncidental = !assignedIncidentalToFirstRow ? fin.incidentalCostsTotal : 0;
+        const rowIncidental = !assignedIncidentalToFirstRow ? fin.settledIncidentalCostsTotal : 0;
         assignedIncidentalToFirstRow = true;
 
         currentPurchases.push({

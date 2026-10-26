@@ -252,13 +252,34 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
     0
   );
   const curFixedTaxTotal = curTaxLand + curTaxBldg;
-  const hasAnySettledPurchase = purchases.some(p => !!p.settlementDate);
+  const hasAnySettledPurchase = purchases.some(p => Boolean(p.settlementDate && p.settlementDate.trim()));
   const hasAnyDepositPaid =
-    !hasAnySettledPurchase && purchases.some(p => !!p.depositSettlementDate);
+    !hasAnySettledPurchase &&
+    purchases.some(p => Boolean(p.depositSettlementDate && p.depositSettlementDate.trim()));
 
   const curInitialCost = isCarriedOver ? Number(initialInventoryCost) || 0 : 0;
   const totalIncidental = incidentalCosts.reduce((acc, c) => acc + (c.amount || 0), 0);
   const totalAcquisition = curInitialCost + curLandPrice + curBldgPrice + curFixedTaxTotal + totalIncidental;
+
+  // 決済済みの仕入金額 & 支払済みの付随費用（期末棚卸残高の算定対象）
+  const settledPurchasesTotal = purchases
+    .filter(p => Boolean(p.settlementDate && p.settlementDate.trim()))
+    .reduce(
+      (acc, p) =>
+        acc +
+        (Number(p.landPurchasePrice) || 0) +
+        (Number(p.buildingPurchasePrice) || 0) +
+        (Number(p.fixedAssetTaxSettlementLand) || 0) +
+        (Number(p.fixedAssetTaxSettlementBuilding) || 0),
+      0
+    );
+  const settledIncidentalTotal = incidentalCosts
+    .filter(c => Boolean(c.paymentDate && c.paymentDate.trim()))
+    .reduce((acc, c) => acc + (c.amount || 0), 0);
+  const hasSettledInventoryBase = hasAnySettledPurchase || curInitialCost > 0;
+  const settledAcquisition = hasSettledInventoryBase
+    ? curInitialCost + settledPurchasesTotal + settledIncidentalTotal
+    : 0;
 
   const totalSalesAmount = sales.reduce((acc, s) => {
     const sTax = (s.fixedAssetTaxSettlementLand || 0) + (s.fixedAssetTaxSettlementBuilding || 0);
@@ -267,7 +288,13 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
   }, 0);
 
   const totalCOGS = sales.reduce((acc, s) => acc + (s.costOfGoodsSold || 0), 0);
-  const endingInventory = Math.max(0, totalAcquisition - totalCOGS);
+  const hasSettledFullSale = sales.some(
+    s => Boolean(s.settlementDate && s.settlementDate.trim()) && s.saleCategory === 'full'
+  );
+  const endingInventory =
+    !hasSettledInventoryBase || hasSettledFullSale
+      ? 0
+      : Math.max(0, settledAcquisition - totalCOGS);
 
   // 複数仕入レコードの追加・更新・削除ハンドラー
   const handleAddPurchase = () => {

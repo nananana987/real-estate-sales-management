@@ -78,8 +78,8 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
         row =>
           row.fin.endingInventory > 0 ||
           row.fin.totalCostOfGoodsSold > 0 ||
-          row.fin.totalAcquisitionCost > 0 ||
-          row.property.initialInventoryCost > 0
+          row.fin.settledAcquisitionCost > 0 ||
+          (row.property.initialInventoryCost || 0) > 0
       );
   }, [properties, currentFY]);
 
@@ -120,7 +120,7 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
           const dateB = b.property.settlementDate || '';
           cmp = dateA.localeCompare(dateB);
         } else if (sortField === 'acquisition') {
-          cmp = a.fin.totalAcquisitionCost - b.fin.totalAcquisitionCost;
+          cmp = a.fin.settledAcquisitionCost - b.fin.settledAcquisitionCost;
         } else if (sortField === 'cogs') {
           cmp = a.fin.totalCostOfGoodsSold - b.fin.totalCostOfGoodsSold;
         } else if (sortField === 'endingInventory') {
@@ -155,9 +155,9 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
     return filteredAndSortedRows.reduce(
       (acc, r) => {
         acc.initialInventory += r.property.initialInventoryCost || 0;
-        acc.purchaseBase += r.fin.purchaseBaseTotal;
-        acc.incidental += r.fin.incidentalCostsTotal;
-        acc.totalAcquisition += r.fin.totalAcquisitionCost;
+        acc.purchaseBase += r.fin.settledPurchaseBaseTotal;
+        acc.incidental += r.fin.settledIncidentalCostsTotal;
+        acc.totalAcquisition += r.fin.settledAcquisitionCost;
         acc.cogs += r.fin.totalCostOfGoodsSold;
         acc.endingInventory += r.fin.endingInventory;
         acc.landArea += r.landAreaNum || 0;
@@ -184,7 +184,7 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
     csv += `基準期末日,${currentFY.endDate}\n`;
     csv += `期末商品棚卸高合計,${totals.endingInventory}\n\n`;
 
-    csv += `No,物件管理コード,物件所在地,地目,種類,土地面積(㎡),建物面積(㎡),取得日(仕入決済日),状態,期首繰越原価(円),総仕入原価(円),計上売上原価(円),期末棚卸残高(円),原価計算プロセス・根拠メモ\n`;
+    csv += `No,物件管理コード,物件所在地,地目,種類,土地面積(㎡),建物面積(㎡),取得日(仕入決済日),状態,期首繰越原価(円),総仕入原価[決済済](円),計上売上原価(円),期末棚卸残高(円),原価計算プロセス・根拠メモ\n`;
 
     filteredAndSortedRows.forEach(({ property: prop, fin, landAreaNum, buildingAreaNum }, idx) => {
       const calcNotes = (prop.sales || [])
@@ -199,7 +199,7 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
         prop.propertyType || '-'
       }",${landStr},${bldgStr},"${prop.settlementDate || '-'}","${fin.statusLabel}",${
         prop.initialInventoryCost || 0
-      },${fin.totalAcquisitionCost},${
+      },${fin.settledAcquisitionCost},${
         fin.totalCostOfGoodsSold
       },${fin.endingInventory},"${calcNotes || prop.notes || '-'}"\n`;
     });
@@ -318,9 +318,9 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
         </div>
 
         <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
-          <span className="text-[11px] text-slate-500 font-medium">総仕入原価累計</span>
+          <span className="text-[11px] text-slate-500 font-medium">総仕入原価累計 (決済済)</span>
           <p className="text-lg font-bold text-blue-700 mt-0.5 font-mono">
-            {formatCurrency(allRows.reduce((sum, r) => sum + r.fin.totalAcquisitionCost, 0))}
+            {formatCurrency(allRows.reduce((sum, r) => sum + r.fin.settledAcquisitionCost, 0))}
           </p>
         </div>
 
@@ -591,7 +591,7 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
                             {formatCurrency(prop.initialInventoryCost || 0)}
                           </td>
                           <td className="py-1.5 px-2.5 text-right font-mono font-semibold text-slate-900 whitespace-nowrap">
-                            {formatCurrency(fin.totalAcquisitionCost)}
+                            {formatCurrency(fin.settledAcquisitionCost)}
                           </td>
                           <td className="py-1.5 px-2.5 text-right font-mono text-amber-800 whitespace-nowrap">
                             {formatCurrency(fin.totalCostOfGoodsSold)}
@@ -661,7 +661,7 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
                                   </div>
                                 ) : (
                                   <p className="text-slate-500 text-[11px]">
-                                    現在未売却のため、総仕入原価 {formatCurrency(fin.totalAcquisitionCost)}{' '}
+                                    現在未売却のため、決済済仕入原価 {formatCurrency(fin.settledAcquisitionCost)}{' '}
                                     が全額期末棚卸高（仕掛品・商品）として計上されています。
                                   </p>
                                 )}
@@ -782,9 +782,9 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
                         </p>
                       </div>
                       <div className="bg-slate-50 p-2 rounded border border-slate-200">
-                        <span className="text-[10px] text-slate-500">総仕入原価</span>
+                        <span className="text-[10px] text-slate-500">総仕入原価 (決済済)</span>
                         <p className="font-bold text-slate-900 font-mono mt-0.2 text-xs">
-                          {formatCurrency(fin.totalAcquisitionCost)}
+                          {formatCurrency(fin.settledAcquisitionCost)}
                         </p>
                       </div>
                       <div className="bg-amber-50/70 p-2 rounded border border-amber-200">
@@ -833,7 +833,7 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
                         </div>
                       ) : (
                         <p className="text-slate-500 text-[11px]">
-                          現在未売却のため、総仕入原価 {formatCurrency(fin.totalAcquisitionCost)}{' '}
+                          現在未売却のため、決済済みの総仕入原価 {formatCurrency(fin.settledAcquisitionCost)}{' '}
                           が全額期末棚卸高（仕掛品・商品）として計上されています。
                         </p>
                       )}

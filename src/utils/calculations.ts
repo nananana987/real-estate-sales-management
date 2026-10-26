@@ -276,42 +276,59 @@ export function determinePropertyStatus(property: Property): { status: PropertyS
   }
 
   const purchases = getPropertyPurchases(property);
-  const hasSettledPurchase = purchases.some(p => !!p.settlementDate) || !!property.settlementDate;
+  const settledPurchases = purchases.filter(p => Boolean(p.settlementDate && p.settlementDate.trim()));
+  const hasSettledPurchase =
+    settledPurchases.length > 0 || Boolean(property.settlementDate && property.settlementDate.trim());
   const hasDepositPaid =
     !hasSettledPurchase &&
-    (purchases.some(p => !!p.depositSettlementDate) || !!property.depositSettlementDate);
-  const settledSales = (property.sales || []).filter(s => !!s.settlementDate);
-  const purchaseTax = getPurchaseFixedAssetTax(property);
-
-  const landPriceSum = purchases.reduce((sum, p) => sum + (p.landPurchasePrice || 0), 0);
-  const bldgPriceSum = purchases.reduce(
-    (sum, p) => sum + (p.buildingPurchasePrice || 0) + (p.buildingPurchaseTax || 0),
-    0
+    (purchases.some(p => Boolean(p.depositSettlementDate && p.depositSettlementDate.trim())) ||
+      Boolean(property.depositSettlementDate && property.depositSettlementDate.trim()));
+  const settledSales = (property.sales || []).filter(s =>
+    Boolean(s.settlementDate && s.settlementDate.trim())
   );
 
-  // 総原価
-  const baseCost =
-    (property.initialInventoryCost || 0) +
-    landPriceSum +
-    bldgPriceSum +
-    purchaseTax.total +
-    (property.incidentalCosts || []).reduce((acc, c) => acc + (c.amount || 0), 0);
+  // 決済済みの仕入原価合計（未決済の仕入・未払の付随費用は除く）
+  const settledPurchaseCost = settledPurchases.reduce((sum, p) => {
+    const pTax = getPurchaseRecordFixedAssetTax(p);
+    return (
+      sum +
+      (p.landPurchasePrice || 0) +
+      (p.buildingPurchasePrice || 0) +
+      (p.buildingPurchaseTax || 0) +
+      pTax.total
+    );
+  }, 0);
+  const settledIncidentalCost = (property.incidentalCosts || [])
+    .filter(c => Boolean(c.paymentDate && c.paymentDate.trim()))
+    .reduce((acc, c) => acc + (c.amount || 0), 0);
+
+  const initialInventoryCost = property.initialInventoryCost || 0;
+  const hasInventoryBase = hasSettledPurchase || initialInventoryCost > 0;
+  const settledBaseCost = hasInventoryBase
+    ? initialInventoryCost + settledPurchaseCost + settledIncidentalCost
+    : 0;
 
   const totalCOGS = (property.sales || []).reduce((acc, s) => acc + (s.costOfGoodsSold || 0), 0);
-  const remainingInventory = Math.max(0, baseCost - totalCOGS);
+  const remainingInventory = Math.max(0, settledBaseCost - totalCOGS);
+  const hasUnsettledPurchase = purchases.some(
+    p =>
+      !p.settlementDate ||
+      (!p.settlementDate.trim() &&
+        ((p.landPurchasePrice || 0) > 0 || (p.buildingPurchasePrice || 0) > 0))
+  );
 
   // 1. 売却済み判定:
-  // - 決済済みの売上があり、かつ全部売却フラグ または 残棚卸高が実質0(100円未満)
+  // - 決済済みの売上があり、かつ全部売却フラグ または (未決済仕入がなく残棚卸高が0)
   if (settledSales.length > 0) {
     const hasFullSale = settledSales.some(s => s.saleCategory === 'full');
-    if (hasFullSale || remainingInventory === 0) {
+    if (hasFullSale || (!hasUnsettledPurchase && remainingInventory === 0 && settledBaseCost > 0)) {
       return { status: 'sold_out', label: '売却済み (完売)' };
     }
     return { status: 'partially_sold', label: '一部売却済み (残あり)' };
   }
 
   // 契約済みの売上があるが未決済の場合、まだ仕入側の状態をベースにする
-  if (hasSettledPurchase) {
+  if (hasSettledPurchase || initialInventoryCost > 0) {
     return { status: 'inventory', label: '決済済み (棚卸・保有中)' };
   }
 
@@ -464,6 +481,8 @@ export function getStatusBadgeClass(status: PropertyStatus): { bg: string; text:
 
 /**
  * 物件の各種金額・当期取引金額・棚卸金額を精密計算
+ * ※未決済の仕入金額（settlementDateが空）および未払の付随費用（paymentDateが空）、
+ *   ならびに未決済物件の付随費用は期末棚卸残高（endingInventory）には含めない
  */
 export function calculatePropertyFinancials(property: Property, fy: FiscalYear): PropertyFinancials {
   const { status, label } = determinePropertyStatus(property);
@@ -481,10 +500,10 @@ export function calculatePropertyFinancials(property: Property, fy: FiscalYear):
     0
   );
 
-  // 仕入基本合計 (土地 + 建物 + 固定資産税精算金)
+  // 仕入基本合計 (土地 + 建物 + 固定資産税精算金) [未決済含む全契約]
   const purchaseBaseTotal = landPurchaseTotal + buildingPurchaseTotal + purchaseTax.total;
 
-  // 付随費用累計
+  // 付随費用累計 [未払含む全体]
   const incidentalCostsTotal = (property.incidentalCosts || []).reduce(
     (acc, c) => acc + (c.amount || 0),
     0
@@ -493,8 +512,43 @@ export function calculatePropertyFinancials(property: Property, fy: FiscalYear):
   // 前期繰越原価 (もし繰越物件なら)
   const initialInventoryCost = property.initialInventoryCost || 0;
 
-  // 総仕入原価
+  // 総仕入原価 [未決済・未払含む全体]
   const totalAcquisitionCost = initialInventoryCost + purchaseBaseTotal + incidentalCostsTotal;
+
+  // --- 決済済みの仕入金額 & 支払済みの付随費用（棚卸計上対象） ---
+  const settledPurchases = purchases.filter(p => Boolean(p.settlementDate && p.settlementDate.trim()));
+  const settledPurchaseBaseTotal = settledPurchases.reduce((sum, p) => {
+    const pTax = getPurchaseRecordFixedAssetTax(p);
+    return (
+      sum +
+      (p.landPurchasePrice || 0) +
+      (p.buildingPurchasePrice || 0) +
+      (p.buildingPurchaseTax || 0) +
+      pTax.total
+    );
+  }, 0);
+  const unsettledPurchaseTotal = Math.max(0, purchaseBaseTotal - settledPurchaseBaseTotal);
+
+  const paidIncidentalCosts = (property.incidentalCosts || []).filter(c =>
+    Boolean(c.paymentDate && c.paymentDate.trim())
+  );
+  const settledIncidentalCostsTotal = paidIncidentalCosts.reduce(
+    (acc, c) => acc + (c.amount || 0),
+    0
+  );
+  const unpaidIncidentalCostsTotal = incidentalCostsTotal - settledIncidentalCostsTotal;
+
+  // 物件自体に決済済みの仕入（または前期繰越残高）があるか
+  const hasSettledInventoryBase = settledPurchases.length > 0 || initialInventoryCost > 0;
+  const isUnsettledProperty =
+    !hasSettledInventoryBase ||
+    status === 'contracted_unsettled' ||
+    status === 'deposit_paid';
+
+  // 棚卸算定ベースとなる決済済総仕入原価（未決済の仕入金額や未払の付随費用、未決済物件の費用は含めない）
+  const settledAcquisitionCost = isUnsettledProperty
+    ? 0
+    : initialInventoryCost + settledPurchaseBaseTotal + settledIncidentalCostsTotal;
 
   // 売上累計
   const sales = property.sales || [];
@@ -504,7 +558,7 @@ export function calculatePropertyFinancials(property: Property, fy: FiscalYear):
   }, 0);
 
   // 決済済みの売上
-  const settledSales = sales.filter(s => !!s.settlementDate);
+  const settledSales = sales.filter(s => Boolean(s.settlementDate && s.settlementDate.trim()));
   const settledSalesAmount = settledSales.reduce((acc, s) => {
     const sTax = getSaleFixedAssetTax(s);
     return acc + (s.landPrice || 0) + (s.buildingPrice || 0) + sTax.total;
@@ -513,8 +567,11 @@ export function calculatePropertyFinancials(property: Property, fy: FiscalYear):
   // 計上売上原価累計
   const totalCostOfGoodsSold = sales.reduce((acc, s) => acc + (s.costOfGoodsSold || 0), 0);
 
-  // 現在の棚卸金額 (完売時は0、一部売却時は控除後残高)
-  const endingInventory = status === 'sold_out' ? 0 : Math.max(0, totalAcquisitionCost - totalCostOfGoodsSold);
+  // 現在の期末棚卸残高 (完売時または未決済時は0、それ以外は決済済仕入原価から計上売上原価を控除した残高)
+  const endingInventory =
+    status === 'sold_out' || isUnsettledProperty
+      ? 0
+      : Math.max(0, settledAcquisitionCost - totalCostOfGoodsSold);
 
   // 粗利 (決済ベース)
   const grossProfit = settledSalesAmount - totalCostOfGoodsSold;
@@ -564,7 +621,7 @@ export function calculatePropertyFinancials(property: Property, fy: FiscalYear):
     }
   });
 
-  // 4. 当期末棚卸物件か (当期末時点で在庫残高がある、または当期中に決済されて在庫化している)
+  // 4. 当期末棚卸物件か (当期末時点で在庫残高がある)
   const isInventoryInCurrentPeriod = endingInventory > 0;
 
   return {
@@ -579,6 +636,11 @@ export function calculatePropertyFinancials(property: Property, fy: FiscalYear):
     purchaseFixedAssetTaxTotal: purchaseTax.total,
     incidentalCostsTotal,
     totalAcquisitionCost,
+    settledPurchaseBaseTotal,
+    settledIncidentalCostsTotal,
+    settledAcquisitionCost,
+    unsettledPurchaseTotal,
+    unpaidIncidentalCostsTotal,
     totalSalesAmount,
     settledSalesAmount,
     totalCostOfGoodsSold,

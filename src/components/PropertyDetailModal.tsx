@@ -150,10 +150,15 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
           </div>
 
           <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs">
-            <span className="text-[10px] text-slate-500">期末棚卸残高 (現在在庫)</span>
+            <span className="text-[10px] text-slate-500">期末棚卸残高 (現在在庫・決済済分)</span>
             <p className="text-sm font-bold text-purple-700 mt-0.5 font-mono">
               {formatCurrency(fin.endingInventory)}
             </p>
+            {(fin.unsettledPurchaseTotal > 0 || fin.unpaidIncidentalCostsTotal > 0) && (
+              <p className="text-[9px] text-amber-700 mt-0.5 leading-tight">
+                ※未決済仕入・未払付随費用 ({formatCurrency(fin.unsettledPurchaseTotal + fin.unpaidIncidentalCostsTotal)}) は除外
+              </p>
+            )}
           </div>
 
           <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs">

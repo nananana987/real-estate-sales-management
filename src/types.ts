@@ -222,19 +222,25 @@ export interface PropertyFinancials {
   landAreaTsubo: number;
   buildingAreaTsubo: number;
   // 仕入関連合計
-  purchaseBaseTotal: number; // 土地仕入 + 建物仕入 + 固定資産税精算金
+  purchaseBaseTotal: number; // 土地仕入 + 建物仕入 + 固定資産税精算金 (全契約)
   purchaseFixedAssetTaxLand: number; // 固定資産税精算金 (土地)
   purchaseFixedAssetTaxBuilding: number; // 固定資産税精算金 (建物本体)
   purchaseFixedAssetTaxBuildingTax: number; // 固定資産税精算金 (建物消費税)
   purchaseFixedAssetTaxTotal: number; // 固定資産税精算金 合計
-  incidentalCostsTotal: number; // 付随費用累計
-  totalAcquisitionCost: number; // 初期繰越 + 仕入本体 + 付随費用
+  incidentalCostsTotal: number; // 付随費用累計 (未払含む全体)
+  totalAcquisitionCost: number; // 初期繰越 + 仕入本体 + 付随費用 (未決済・未払含む全体)
+  // 決済済みの仕入・支払済みの付随費用（期末棚卸残高の算定対象）
+  settledPurchaseBaseTotal: number; // 決済済みの仕入本体合計
+  settledIncidentalCostsTotal: number; // 支払済みの付随費用合計
+  settledAcquisitionCost: number; // 決済済みの総仕入原価 (期首繰越 + 決済済仕入 + 支払済付随費用)
+  unsettledPurchaseTotal: number; // 未決済の仕入本体合計
+  unpaidIncidentalCostsTotal: number; // 未払いの付随費用合計
   // 売上関連合計
   totalSalesAmount: number; // 累計売上高 (全売上レコード)
   settledSalesAmount: number; // 決済済売上高
   // 原価・棚卸
   totalCostOfGoodsSold: number; // 計上売上原価累計
-  endingInventory: number; // 現在の棚卸金額 (総仕入原価 - 計上売上原価)
+  endingInventory: number; // 現在の棚卸金額 (決済済総仕入原価 - 計上売上原価、未決済仕入・未払付随費用は含めない)
   grossProfit: number; // 確定粗利 (決済済売上 - 計上売上原価)
   grossProfitMargin: number; // 粗利率
   // 当期取引金額 (選択事業年度内での判定)
