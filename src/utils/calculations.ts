@@ -267,7 +267,53 @@ export function getSaleFixedAssetTax(sale: SaleRecord): { land: number; building
 /**
  * 物件のステータスを自動判定
  */
-export function determinePropertyStatus(property: Property): { status: PropertyStatus; label: string } {
+/**
+ * 物件の「手動設定された期首繰越原価（仕入レコード・付随費用レコードに含まれない初期残高のみ）」を取得。
+ * - 旧バージョンの年度更新(rolloverToNewFiscalYear)では、既存の仕入レコード(purchases)や付随費用(incidentalCosts)を
+ *   保持したまま、期末棚卸高(endingInventory)を initialInventoryCost に上書き保存していたため、
+ *   initialInventoryCost + 仕入金額 + 付随費用 で二重計上（倍増）が発生していた。
+ * - 仕入本体金額(purchaseBaseTotal)が登録されている物件は仕入明細側で原価計算されるため 0 とする。
+ * - また、支払済付随費用が存在しかつ自動繰越メモ（「期末棚卸残高より繰越」等）がある場合も二重計上防止のため 0 とする。
+ */
+export function getManualOpeningInventoryCost(property: Property): number {
+  const rawInitial = property.initialInventoryCost || 0;
+  if (rawInitial <= 0) return 0;
+
+  const purchases = getPropertyPurchases(property);
+  const purchaseTax = getPurchaseFixedAssetTax(property);
+  const landPurchaseTotal = purchases.reduce((sum, p) => sum + (p.landPurchasePrice || 0), 0);
+  const buildingPurchaseTotal = purchases.reduce(
+    (sum, p) => sum + (p.buildingPurchasePrice || 0) + (p.buildingPurchaseTax || 0),
+    0
+  );
+  const purchaseBaseTotal = landPurchaseTotal + buildingPurchaseTotal + purchaseTax.total;
+
+  // 仕入明細が登録されている場合は、仕入明細から原価を算出するため initialInventoryCost の二重加算を行わない
+  if (purchaseBaseTotal > 0) {
+    return 0;
+  }
+
+  const paidIncidentalTotal = (property.incidentalCosts || [])
+    .filter(c => Boolean(c.paymentDate && c.paymentDate.trim()))
+    .reduce((acc, c) => acc + (c.amount || 0), 0);
+
+  const note = property.initialInventoryNote || '';
+  const isAutoRolloverNote = Boolean(note && /期末(?:棚卸)?残高.*より(?:自動)?繰越/.test(note));
+
+  if (isAutoRolloverNote && paidIncidentalTotal > 0) {
+    return 0;
+  }
+
+  return rawInitial;
+}
+
+/**
+ * 物件のステータスを自動判定
+ */
+export function determinePropertyStatus(
+  property: Property,
+  fy?: FiscalYear
+): { status: PropertyStatus; label: string } {
   if (property.statusOverride) {
     return {
       status: property.statusOverride,
@@ -275,16 +321,24 @@ export function determinePropertyStatus(property: Property): { status: PropertyS
     };
   }
 
+  const isSettledAsOfPeriodEnd = (dateStr?: string | null): boolean => {
+    if (!dateStr || !dateStr.trim()) return false;
+    if (fy && fy.isClosed) {
+      return dateStr <= fy.endDate;
+    }
+    return true;
+  };
+
   const purchases = getPropertyPurchases(property);
-  const settledPurchases = purchases.filter(p => Boolean(p.settlementDate && p.settlementDate.trim()));
+  const settledPurchases = purchases.filter(p => isSettledAsOfPeriodEnd(p.settlementDate));
   const hasSettledPurchase =
-    settledPurchases.length > 0 || Boolean(property.settlementDate && property.settlementDate.trim());
+    settledPurchases.length > 0 || isSettledAsOfPeriodEnd(property.settlementDate);
   const hasDepositPaid =
     !hasSettledPurchase &&
-    (purchases.some(p => Boolean(p.depositSettlementDate && p.depositSettlementDate.trim())) ||
-      Boolean(property.depositSettlementDate && property.depositSettlementDate.trim()));
+    (purchases.some(p => isSettledAsOfPeriodEnd(p.depositSettlementDate)) ||
+      isSettledAsOfPeriodEnd(property.depositSettlementDate));
   const settledSales = (property.sales || []).filter(s =>
-    Boolean(s.settlementDate && s.settlementDate.trim())
+    isSettledAsOfPeriodEnd(s.settlementDate)
   );
 
   // 決済済みの仕入原価合計（未決済の仕入・未払の付随費用は除く）
@@ -299,19 +353,18 @@ export function determinePropertyStatus(property: Property): { status: PropertyS
     );
   }, 0);
   const settledIncidentalCost = (property.incidentalCosts || [])
-    .filter(c => Boolean(c.paymentDate && c.paymentDate.trim()))
+    .filter(c => isSettledAsOfPeriodEnd(c.paymentDate))
     .reduce((acc, c) => acc + (c.amount || 0), 0);
 
-  const initialInventoryCost = property.initialInventoryCost || 0;
-  const settledBaseCost = initialInventoryCost + settledPurchaseCost + settledIncidentalCost;
+  const manualOpeningCost = getManualOpeningInventoryCost(property);
+  const settledBaseCost = manualOpeningCost + settledPurchaseCost + settledIncidentalCost;
 
   const settledCOGS = settledSales.reduce((acc, s) => acc + (s.costOfGoodsSold || 0), 0);
   const remainingInventory = Math.max(0, settledBaseCost - settledCOGS);
   const hasUnsettledPurchase = purchases.some(
     p =>
-      !p.settlementDate ||
-      (!p.settlementDate.trim() &&
-        ((p.landPurchasePrice || 0) > 0 || (p.buildingPurchasePrice || 0) > 0))
+      !isSettledAsOfPeriodEnd(p.settlementDate) &&
+      ((p.landPurchasePrice || 0) > 0 || (p.buildingPurchasePrice || 0) > 0)
   );
 
   // 1. 売却済み判定:
@@ -325,7 +378,7 @@ export function determinePropertyStatus(property: Property): { status: PropertyS
   }
 
   // 契約済みの売上があるが未決済の場合、まだ仕入側の状態をベースにする
-  if (hasSettledPurchase || initialInventoryCost > 0) {
+  if (hasSettledPurchase || manualOpeningCost > 0) {
     return { status: 'inventory', label: '決済済み (棚卸・保有中)' };
   }
 
@@ -482,7 +535,15 @@ export function getStatusBadgeClass(status: PropertyStatus): { bg: string; text:
  *   仕入本体が未決済であっても、支払済みの付随費用（paymentDate入力済）がある場合は期末棚卸残高に含める。
  */
 export function calculatePropertyFinancials(property: Property, fy: FiscalYear): PropertyFinancials {
-  const { status, label } = determinePropertyStatus(property);
+  const { status, label } = determinePropertyStatus(property, fy);
+
+  const isSettledAsOfPeriodEnd = (dateStr?: string | null): boolean => {
+    if (!dateStr || !dateStr.trim()) return false;
+    if (fy.isClosed) {
+      return dateStr <= fy.endDate;
+    }
+    return true;
+  };
 
   // 面積坪換算
   const landAreaTsubo = (property.landArea || 0) * SQM_TO_TSUBO;
@@ -506,14 +567,14 @@ export function calculatePropertyFinancials(property: Property, fy: FiscalYear):
     0
   );
 
-  // 前期繰越原価 (もし繰越物件なら)
-  const initialInventoryCost = property.initialInventoryCost || 0;
+  // 手動設定された期首繰越原価 (仕入レコードや付随費用と重複しない純粋な初期残高のみ)
+  const manualOpeningCost = getManualOpeningInventoryCost(property);
 
   // 総仕入原価 [未決済・未払含む全体]
-  const totalAcquisitionCost = initialInventoryCost + purchaseBaseTotal + incidentalCostsTotal;
+  const totalAcquisitionCost = manualOpeningCost + purchaseBaseTotal + incidentalCostsTotal;
 
   // --- 決済済みの仕入金額 & 支払済みの付随費用（棚卸計上対象） ---
-  const settledPurchases = purchases.filter(p => Boolean(p.settlementDate && p.settlementDate.trim()));
+  const settledPurchases = purchases.filter(p => isSettledAsOfPeriodEnd(p.settlementDate));
   const settledPurchaseBaseTotal = settledPurchases.reduce((sum, p) => {
     const pTax = getPurchaseRecordFixedAssetTax(p);
     return (
@@ -527,7 +588,7 @@ export function calculatePropertyFinancials(property: Property, fy: FiscalYear):
   const unsettledPurchaseTotal = Math.max(0, purchaseBaseTotal - settledPurchaseBaseTotal);
 
   const paidIncidentalCosts = (property.incidentalCosts || []).filter(c =>
-    Boolean(c.paymentDate && c.paymentDate.trim())
+    isSettledAsOfPeriodEnd(c.paymentDate)
   );
   const settledIncidentalCostsTotal = paidIncidentalCosts.reduce(
     (acc, c) => acc + (c.amount || 0),
@@ -537,7 +598,7 @@ export function calculatePropertyFinancials(property: Property, fy: FiscalYear):
 
   // 棚卸算定ベースとなる決済済総仕入原価（未決済の仕入金額や未払の付随費用は含めない。仕入本体が未決済でも支払済みの付随費用は含める）
   const settledAcquisitionCost =
-    initialInventoryCost + settledPurchaseBaseTotal + settledIncidentalCostsTotal;
+    manualOpeningCost + settledPurchaseBaseTotal + settledIncidentalCostsTotal;
 
   // 売上累計
   const sales = property.sales || [];
@@ -547,7 +608,7 @@ export function calculatePropertyFinancials(property: Property, fy: FiscalYear):
   }, 0);
 
   // 決済済みの売上
-  const settledSales = sales.filter(s => Boolean(s.settlementDate && s.settlementDate.trim()));
+  const settledSales = sales.filter(s => isSettledAsOfPeriodEnd(s.settlementDate));
   const settledSalesAmount = settledSales.reduce((acc, s) => {
     const sTax = getSaleFixedAssetTax(s);
     return acc + (s.landPrice || 0) + (s.buildingPrice || 0) + sTax.total;
@@ -557,9 +618,48 @@ export function calculatePropertyFinancials(property: Property, fy: FiscalYear):
   const settledCostOfGoodsSold = settledSales.reduce((acc, s) => acc + (s.costOfGoodsSold || 0), 0);
   const totalCostOfGoodsSold = settledCostOfGoodsSold;
 
-  // 現在の期末棚卸残高 (完売時は0、それ以外は決済済仕入原価[前期繰越+決済済仕入本体+支払済付随費用]から決済済計上売上原価を控除した残高)
+  // --- 当期期首棚卸高 (beginningInventory: 前期末棚卸残高からの繰越分) ---
+  const priorSettledPurchases = purchases.filter(p => isDateBeforeFiscalYear(p.settlementDate, fy));
+  const priorPurchaseBaseTotal = priorSettledPurchases.reduce((sum, p) => {
+    const pTax = getPurchaseRecordFixedAssetTax(p);
+    return (
+      sum +
+      (p.landPurchasePrice || 0) +
+      (p.buildingPurchasePrice || 0) +
+      (p.buildingPurchaseTax || 0) +
+      pTax.total
+    );
+  }, 0);
+
+  const priorPaidIncidentalTotal = (property.incidentalCosts || [])
+    .filter(c => isDateBeforeFiscalYear(c.paymentDate, fy))
+    .reduce((acc, c) => acc + (c.amount || 0), 0);
+
+  const priorSettledSales = sales.filter(s => isDateBeforeFiscalYear(s.settlementDate, fy));
+  const priorCOGSTotal = priorSettledSales.reduce((acc, s) => acc + (s.costOfGoodsSold || 0), 0);
+  const hasPriorFullSale = priorSettledSales.some(s => s.saleCategory === 'full');
+  const hasUnsettledPriorPurchase = purchases.some(
+    p =>
+      !isDateBeforeFiscalYear(p.settlementDate, fy) &&
+      ((p.landPurchasePrice || 0) > 0 || (p.buildingPurchasePrice || 0) > 0)
+  );
+
+  const priorAcquisitionCost = manualOpeningCost + priorPurchaseBaseTotal + priorPaidIncidentalTotal;
+  const isSoldOutBeforePeriod =
+    hasPriorFullSale ||
+    (priorSettledSales.length > 0 &&
+      !hasUnsettledPriorPurchase &&
+      priorAcquisitionCost > 0 &&
+      priorAcquisitionCost - priorCOGSTotal <= 0) ||
+    isPropertySoldInPriorPeriod(property, fy);
+
+  const beginningInventory = isSoldOutBeforePeriod
+    ? 0
+    : Math.max(0, priorAcquisitionCost - priorCOGSTotal);
+
+  // 現在の期末棚卸残高 (前期以前に完売済または当期完売時は0、それ以外は決済済仕入原価から決済済計上売上原価を控除した残高)
   const endingInventory =
-    status === 'sold_out'
+    status === 'sold_out' || isSoldOutBeforePeriod
       ? 0
       : Math.max(0, settledAcquisitionCost - settledCostOfGoodsSold);
 
@@ -633,6 +733,7 @@ export function calculatePropertyFinancials(property: Property, fy: FiscalYear):
     unpaidIncidentalCostsTotal,
     totalSalesAmount,
     settledSalesAmount,
+    beginningInventory,
     totalCostOfGoodsSold,
     endingInventory,
     grossProfit,
@@ -671,38 +772,10 @@ export function calculateAccountingSummary(properties: Property[], fy: FiscalYea
 
   properties.forEach(property => {
     const purchases = getPropertyPurchases(property);
+    const fin = calculatePropertyFinancials(property, fy);
 
-    // 1. 期首棚卸高の集計 (前期からの繰越残高)
-    if (property.initialInventoryCost && property.initialInventoryCost > 0) {
-      beginningInventoryTotal += property.initialInventoryCost;
-    } else {
-      // もし前期以前に決済された仕入または支払済みの付随費用があり、前期末時点で残高があった場合の原価
-      const prevPurchases = purchases.filter(p => isDateBeforeFiscalYear(p.settlementDate, fy));
-      const prevCosts = (property.incidentalCosts || [])
-        .filter(c => isDateBeforeFiscalYear(c.paymentDate, fy))
-        .reduce((sum, c) => sum + (c.amount || 0), 0);
-      if (prevPurchases.length > 0 || prevCosts > 0) {
-        const prevBase = prevPurchases.reduce((sum, p) => {
-          const pTax = getPurchaseRecordFixedAssetTax(p);
-          return (
-            sum +
-            (p.landPurchasePrice || 0) +
-            (p.buildingPurchasePrice || 0) +
-            (p.buildingPurchaseTax || 0) +
-            pTax.total
-          );
-        }, 0);
-        // 前期以前の売上原価
-        const prevCOGS = (property.sales || [])
-          .filter(s => isDateBeforeFiscalYear(s.settlementDate, fy))
-          .reduce((sum, s) => sum + (s.costOfGoodsSold || 0), 0);
-
-        const carriedBalance = Math.max(0, prevBase + prevCosts - prevCOGS);
-        if (carriedBalance > 0 && !property.initialInventoryCost) {
-          beginningInventoryTotal += carriedBalance;
-        }
-      }
-    }
+    // 1. 期首棚卸高の集計 (前期末棚卸残高からの正確な繰越残高)
+    beginningInventoryTotal += fin.beginningInventory;
 
     // 2. 当期仕入科目 (各仕入レコードの決済日が当期内)
     purchases.forEach(p => {
@@ -739,7 +812,6 @@ export function calculateAccountingSummary(properties: Property[], fy: FiscalYea
     });
 
     // 5. 各物件の期末棚卸金額
-    const fin = calculatePropertyFinancials(property, fy);
     endingInventoryTotal += fin.endingInventory;
   });
 

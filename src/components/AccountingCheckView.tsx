@@ -220,12 +220,17 @@ export const AccountingCheckView: React.FC<AccountingCheckViewProps> = ({
     });
 
     // 棚卸
-    if (fin.endingInventory > 0 || fin.currentPeriodPurchase > 0 || fin.currentPeriodCOGS > 0) {
+    if (
+      fin.beginningInventory > 0 ||
+      fin.endingInventory > 0 ||
+      fin.currentPeriodPurchase > 0 ||
+      fin.currentPeriodCOGS > 0
+    ) {
       inventoryItems.push({
         propertyCode: prop.code,
         propertyName: prop.location,
         status: fin.statusLabel,
-        initialCost: prop.initialInventoryCost || 0,
+        initialCost: fin.beginningInventory,
         currentPurchase: fin.currentPeriodPurchase,
         currentCOGS: fin.currentPeriodCOGS,
         endingInventory: fin.endingInventory,

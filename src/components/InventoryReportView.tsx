@@ -26,6 +26,7 @@ import {
   calculateAccountingSummary,
   getStatusBadgeClass,
   getPropertyTypeBadgeClass,
+  isPropertySoldInPriorPeriod,
 } from '../utils/calculations';
 import { downloadCSV } from '../utils/storage';
 
@@ -53,9 +54,10 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
   const [expandedRowIds, setExpandedRowIds] = useState<Set<string>>(new Set());
   const [viewStyle, setViewStyle] = useState<'table' | 'cards'>('table'); // Default: 一覧表(table)
 
-  // Calculate row financials
+  // Calculate row financials (前期以前に売却完了した物件は当期の棚卸一覧から除外)
   const allRows = useMemo(() => {
     return properties
+      .filter(prop => !isPropertySoldInPriorPeriod(prop, currentFY))
       .map(prop => {
         const fin = calculatePropertyFinancials(prop, currentFY);
         const landAreaNum =
@@ -77,9 +79,9 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
       .filter(
         row =>
           row.fin.endingInventory > 0 ||
+          row.fin.beginningInventory > 0 ||
           row.fin.totalCostOfGoodsSold > 0 ||
-          row.fin.settledAcquisitionCost > 0 ||
-          (row.property.initialInventoryCost || 0) > 0
+          row.fin.settledAcquisitionCost > 0
       );
   }, [properties, currentFY]);
 
@@ -154,7 +156,7 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
   const totals = useMemo(() => {
     return filteredAndSortedRows.reduce(
       (acc, r) => {
-        acc.initialInventory += r.property.initialInventoryCost || 0;
+        acc.initialInventory += r.fin.beginningInventory;
         acc.purchaseBase += r.fin.settledPurchaseBaseTotal;
         acc.incidental += r.fin.settledIncidentalCostsTotal;
         acc.totalAcquisition += r.fin.settledAcquisitionCost;
@@ -198,7 +200,7 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
       csv += `${idx + 1},"${prop.code}","${prop.location || prop.name}","${prop.landCategory || '-'}","${
         prop.propertyType || '-'
       }",${landStr},${bldgStr},"${prop.settlementDate || '-'}","${fin.statusLabel}",${
-        prop.initialInventoryCost || 0
+        fin.beginningInventory
       },${fin.settledAcquisitionCost},${
         fin.totalCostOfGoodsSold
       },${fin.endingInventory},"${calcNotes || prop.notes || '-'}"\n`;
@@ -601,7 +603,7 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
                             </span>
                           </td>
                           <td className="py-1.5 px-1.5 text-right font-mono text-slate-700 whitespace-nowrap tracking-tight">
-                            {formatCurrency(prop.initialInventoryCost || 0)}
+                            {formatCurrency(fin.beginningInventory)}
                           </td>
                           <td className="py-1.5 px-1.5 text-right font-mono font-semibold text-slate-900 whitespace-nowrap tracking-tight">
                             {formatCurrency(fin.settledAcquisitionCost)}
@@ -798,7 +800,7 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
                       <div className="bg-slate-50 p-2 rounded border border-slate-200">
                         <span className="text-[10px] text-slate-500">前期繰越原価</span>
                         <p className="font-bold text-slate-800 font-mono mt-0.2 text-xs">
-                          {formatCurrency(prop.initialInventoryCost || 0)}
+                          {formatCurrency(fin.beginningInventory)}
                         </p>
                       </div>
                       <div className="bg-slate-50 p-2 rounded border border-slate-200">

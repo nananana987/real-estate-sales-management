@@ -239,6 +239,7 @@ export interface PropertyFinancials {
   totalSalesAmount: number; // 累計売上高 (全売上レコード)
   settledSalesAmount: number; // 決済済売上高
   // 原価・棚卸
+  beginningInventory: number; // 当期期首棚卸高 (前期繰越棚卸残高)
   totalCostOfGoodsSold: number; // 計上売上原価累計
   endingInventory: number; // 現在の棚卸金額 (決済済総仕入原価 - 計上売上原価、未決済仕入・未払付随費用は含めない)
   grossProfit: number; // 確定粗利 (決済済売上 - 計上売上原価)

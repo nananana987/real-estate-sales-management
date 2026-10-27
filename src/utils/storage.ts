@@ -1,6 +1,6 @@
 import { Property, FiscalYear, CompanyInfo } from '../types';
 import { initialFiscalYears, initialProperties, initialCompanyInfo } from './sampleData';
-import { calculatePropertyFinancials } from './calculations';
+import { calculatePropertyFinancials, getManualOpeningInventoryCost } from './calculations';
 
 const PROPERTIES_KEY = 're_sales_mgmt_properties_v2';
 const FISCAL_YEARS_KEY = 're_sales_mgmt_fiscal_years_v2';
@@ -334,19 +334,25 @@ export function rolloverToNewFiscalYear(
   // 物件の繰越処理
   const updatedProperties = allProperties.map(prop => {
     const fin = calculatePropertyFinancials(prop, currentFY);
+    const manualOpeningCost = getManualOpeningInventoryCost(prop);
 
     // 完売した物件は過去年度(currentFY.id)のまま据え置き（新年度には繰り越さない）
     if (fin.status === 'sold_out' || fin.endingInventory === 0) {
-      return prop;
+      return {
+        ...prop,
+        initialInventoryCost: manualOpeningCost > 0 ? manualOpeningCost : undefined,
+      };
     }
 
     // 保有中・一部売却など残高がある物件は新年度へ繰越
+    // ※仕入レコード(purchases)や付随費用(incidentalCosts)はそのまま保持されるため、
+    //   initialInventoryCostに期末棚卸高(fin.endingInventory)を上書きすると二重計上になる。
+    //   期首棚卸高(beginningInventory)は前期以前の決済済仕入・支払済付随費用から自動算出される。
     return {
       ...prop,
       fiscalYearId: newFYId,
       isCarriedOver: true,
-      // 現在の期末棚卸金額を新年度の期首棚卸残高としてセット
-      initialInventoryCost: fin.endingInventory,
+      initialInventoryCost: manualOpeningCost > 0 ? manualOpeningCost : undefined,
       initialInventoryNote: `第${currentFY.periodNumber}期末棚卸残高より繰越 (${fin.endingInventory.toLocaleString('ja-JP')}円)`,
       updatedAt: new Date().toISOString(),
     };

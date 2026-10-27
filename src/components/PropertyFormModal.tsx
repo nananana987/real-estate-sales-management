@@ -29,6 +29,7 @@ import {
   formatCurrency,
   SQM_TO_TSUBO,
   getPropertyPurchases,
+  getManualOpeningInventoryCost,
 } from '../utils/calculations';
 import { generateNextPropertyCode } from '../utils/codeGenerator';
 import { DateInput } from './DateInput';
@@ -166,7 +167,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
       setPurchases(normalizedPurchases);
 
       setIsCarriedOver(editingProperty.isCarriedOver || false);
-      setInitialInventoryCost(editingProperty.initialInventoryCost || 0);
+      setInitialInventoryCost(getManualOpeningInventoryCost(editingProperty));
       setInitialInventoryNote(editingProperty.initialInventoryNote || '');
       setNotes(editingProperty.notes || '');
       setPropertyAttachments(editingProperty.attachments || []);
@@ -257,9 +258,11 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
     !hasAnySettledPurchase &&
     purchases.some(p => Boolean(p.depositSettlementDate && p.depositSettlementDate.trim()));
 
-  const curInitialCost = isCarriedOver ? Number(initialInventoryCost) || 0 : 0;
+  const curPurchaseBaseTotal = curLandPrice + curBldgPrice + curFixedTaxTotal;
+  const curInitialCost =
+    isCarriedOver && curPurchaseBaseTotal === 0 ? Number(initialInventoryCost) || 0 : 0;
   const totalIncidental = incidentalCosts.reduce((acc, c) => acc + (c.amount || 0), 0);
-  const totalAcquisition = curInitialCost + curLandPrice + curBldgPrice + curFixedTaxTotal + totalIncidental;
+  const totalAcquisition = curInitialCost + curPurchaseBaseTotal + totalIncidental;
 
   // 決済済みの仕入金額 & 支払済みの付随費用（期末棚卸残高の算定対象）
   const settledPurchasesTotal = purchases
@@ -805,7 +808,8 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
       fixedAssetTaxSettlement: curFixedTaxTotal,
       purchases: cleanedPurchases,
       isCarriedOver,
-      initialInventoryCost: isCarriedOver ? Number(initialInventoryCost) || 0 : undefined,
+      initialInventoryCost:
+        isCarriedOver && curInitialCost > 0 ? curInitialCost : undefined,
       initialInventoryNote: isCarriedOver ? initialInventoryNote : undefined,
       fiscalYearId: editingProperty?.fiscalYearId || currentFY.id,
       incidentalCosts,
