@@ -43,11 +43,11 @@ export const LocalFileStatusWidget: React.FC<LocalFileStatusWidgetProps> = ({
       <button
         type="button"
         onClick={onOpenModal}
-        className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-300 transition-colors shadow-2xs cursor-pointer"
+        className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-300 transition-colors shadow-2xs cursor-pointer whitespace-nowrap"
         title="ブラウザがFile System Access API非対応のため手動保存モードです"
       >
-        <Save className="w-3.5 h-3.5 text-slate-500" />
-        <span className="font-bold">手動保存モード</span>
+        <Save className="w-3 h-3 text-slate-500" />
+        <span className="font-bold">手動保存</span>
       </button>
     );
   }
@@ -55,36 +55,36 @@ export const LocalFileStatusWidget: React.FC<LocalFileStatusWidgetProps> = ({
   // 2. ファイル未選択時: 開く / 新規作成 のクイックボタン
   if (status === 'no_file' || !fileName) {
     return (
-      <div className="inline-flex items-center space-x-1 bg-amber-50/90 border border-amber-300 rounded-lg p-0.5 text-xs shadow-2xs">
+      <div className="inline-flex items-center space-x-1 bg-amber-50/90 border border-amber-300 rounded-md p-0.5 text-[11px] shadow-2xs whitespace-nowrap">
         <button
           type="button"
           onClick={onOpenModal}
-          className="inline-flex items-center space-x-1 px-2 py-0.5 text-amber-900 hover:text-amber-950 font-bold transition-colors cursor-pointer"
+          className="inline-flex items-center space-x-1 px-1.5 py-0.5 text-amber-900 hover:text-amber-950 font-bold transition-colors cursor-pointer"
           title="PCローカルの保存先ファイル（data.jsonなど）を選択してください"
         >
-          <HardDrive className="w-3.5 h-3.5 text-amber-600" />
-          <span className="hidden md:inline">保存先ファイル: </span>
+          <HardDrive className="w-3 h-3 text-amber-600" />
+          <span className="hidden xl:inline">保存先: </span>
           <span className="underline decoration-amber-400">未選択</span>
         </button>
 
         <button
           type="button"
           onClick={onOpenFile}
-          className="inline-flex items-center space-x-1 px-2 py-0.5 bg-white hover:bg-amber-100 text-amber-900 border border-amber-200 rounded font-bold transition-all shadow-2xs cursor-pointer"
+          className="inline-flex items-center space-x-0.5 px-1.5 py-0.5 bg-white hover:bg-amber-100 text-amber-900 border border-amber-200 rounded font-bold transition-all shadow-2xs cursor-pointer"
           title="PC上の既存JSONファイルを開く"
         >
-          <FolderOpen className="w-3 h-3 text-blue-600" />
+          <FolderOpen className="w-2.5 h-2.5 text-blue-600" />
           <span>開く</span>
         </button>
 
         <button
           type="button"
           onClick={onCreateNewFile}
-          className="inline-flex items-center space-x-1 px-2 py-0.5 bg-amber-600 hover:bg-amber-700 text-white rounded font-bold transition-all shadow-2xs cursor-pointer"
+          className="inline-flex items-center space-x-0.5 px-1.5 py-0.5 bg-amber-600 hover:bg-amber-700 text-white rounded font-bold transition-all shadow-2xs cursor-pointer"
           title="新しいJSONファイルをPC上に作成して自動保存を開始"
         >
-          <Plus className="w-3 h-3" />
-          <span className="hidden sm:inline">新規作成</span>
+          <Plus className="w-2.5 h-2.5" />
+          <span className="hidden sm:inline">新規</span>
         </button>
       </div>
     );

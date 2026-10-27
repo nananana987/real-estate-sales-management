@@ -100,36 +100,36 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="bg-white text-slate-900 border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
       {/* Top Banner */}
-      <div className="max-w-[1600px] mx-auto px-3 sm:px-4 lg:px-6">
-        <div className="flex items-center justify-between h-14">
+      <div className="max-w-[1600px] mx-auto px-2.5 sm:px-4 lg:px-5">
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 py-1.5 min-h-12">
           {/* Logo & Title */}
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-xs">
-              <Building2 className="w-4.5 h-4.5" />
+          <div className="flex items-center space-x-2 min-w-0 shrink-0">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
+              <Building2 className="w-4 h-4" />
             </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <h1 className="text-sm font-bold text-slate-900 tracking-tight">
+            <div className="min-w-0">
+              <div className="flex items-center space-x-1.5">
+                <h1 className="text-sm font-bold text-slate-900 tracking-tight whitespace-nowrap">
                   不動産販売・原価管理
                 </h1>
                 <button
                   type="button"
                   onClick={onOpenCompanyModal}
-                  className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors cursor-pointer"
+                  className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors cursor-pointer whitespace-nowrap max-w-[160px] truncate"
                   title="会社・顧問先情報を設定"
                 >
-                  <Building2 className="w-3 h-3" />
-                  <span>{companyInfo.name ? companyInfo.name : '会社情報設定'}</span>
+                  <Building2 className="w-2.5 h-2.5 shrink-0" />
+                  <span className="truncate">{companyInfo.name ? companyInfo.name : '会社情報設定'}</span>
                 </button>
               </div>
-              <p className="text-[10px] text-slate-500 font-medium hidden sm:block">
+              <p className="text-[10px] text-slate-500 font-medium hidden xl:block whitespace-nowrap">
                 仕入・付随費用・分筆売上・期末棚卸 & 会計科目突合
               </p>
             </div>
           </div>
 
           {/* Local File Storage, Fiscal Year & Global Actions */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center flex-wrap gap-1.5">
             {/* PC Local File Storage Status & Action Widget */}
             <LocalFileStatusWidget
               fileName={localFileName}
@@ -144,25 +144,25 @@ export const Header: React.FC<HeaderProps> = ({
             />
 
             {/* Fiscal Year Dropdown */}
-            <div className="relative inline-flex items-center bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1 text-slate-800 transition-colors shadow-2xs">
-              <Calendar className="w-3.5 h-3.5 text-blue-600 mr-1.5 shrink-0" />
+            <div className="relative inline-flex items-center bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-md px-2 py-0.5 text-slate-800 transition-colors shadow-2xs">
+              <Calendar className="w-3 h-3 text-blue-600 mr-1 shrink-0" />
               <select
                 id="fiscal-year-select"
                 aria-label="事業年度を選択"
                 value={currentFY.id}
                 onChange={e => onSelectFiscalYear(e.target.value)}
-                className="bg-transparent text-xs font-bold text-slate-800 pr-3 py-0.5 focus:outline-hidden cursor-pointer"
+                className="bg-transparent text-[11px] font-bold text-slate-800 pr-1.5 py-0.5 focus:outline-hidden cursor-pointer max-w-[210px] sm:max-w-[240px] truncate"
               >
                 {fiscalYears.map(fy => (
                   <option key={fy.id} value={fy.id} className="bg-white text-slate-900 font-medium">
-                    {fy.name} {fy.isCurrent ? '（当期）' : ''}
+                    {fy.name} {fy.isCurrent ? '(当期)' : ''}
                   </option>
                 ))}
               </select>
               <button
                 type="button"
                 onClick={onOpenFYModal}
-                className="ml-1 text-[11px] text-slate-700 hover:text-blue-700 bg-white hover:bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md font-bold transition-all shadow-2xs cursor-pointer"
+                className="ml-1 text-[10px] text-slate-700 hover:text-blue-700 bg-white hover:bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap"
                 title="年度の管理・新規作成・更新"
               >
                 設定
@@ -173,19 +173,19 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={onOpenCsvImport}
-              className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+              className="inline-flex items-center space-x-1 px-2 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-[11px] font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap"
               title="CSVファイルから物件データを一括取込"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <FileSpreadsheet className="w-3 h-3 text-emerald-600 shrink-0" />
               <span className="hidden sm:inline">CSV取込</span>
             </button>
 
             {/* File & Backup Menu */}
-            <div className="flex items-center space-x-1 border-l border-slate-200 pl-2">
+            <div className="flex items-center space-x-0.5 border-l border-slate-200 pl-1.5">
               <button
                 type="button"
                 onClick={onOpenLocalFileManagerModal}
-                className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
+                className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded transition-colors cursor-pointer"
                 title="ファイル保存・バックアップ設定"
               >
                 <Settings className="w-3.5 h-3.5" />
@@ -193,7 +193,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={handleExportBackup}
-                className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors cursor-pointer hidden md:inline-block"
+                className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded transition-colors cursor-pointer hidden md:inline-block"
                 title="バックアップ保存 (JSON)"
               >
                 <Download className="w-3.5 h-3.5" />
@@ -201,7 +201,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={handleImportClick}
-                className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors cursor-pointer hidden md:inline-block"
+                className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded transition-colors cursor-pointer hidden md:inline-block"
                 title="バックアップ復元 (JSON)"
               >
                 <Upload className="w-3.5 h-3.5" />
@@ -219,20 +219,20 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={onOpenNewPropertyModal}
-              className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+              className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold shadow-xs transition-all cursor-pointer whitespace-nowrap"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-3.5 h-3.5 shrink-0" />
               <span>新規物件</span>
             </button>
           </div>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex space-x-1 overflow-x-auto scrollbar-none border-t border-slate-100 pt-1">
+        <div className="flex flex-wrap gap-x-0.5 border-t border-slate-100 pt-0.5">
           <button
             type="button"
             onClick={() => onSelectTab('properties')}
-            className={`inline-flex items-center space-x-1.5 py-2 px-3 text-xs font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer rounded-t-md ${
+            className={`inline-flex items-center space-x-1 py-1.5 px-2.5 text-xs font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer rounded-t-md ${
               activeTab === 'properties'
                 ? 'border-blue-600 text-blue-700 bg-blue-50/60 font-bold'
                 : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -245,7 +245,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             type="button"
             onClick={() => onSelectTab('sold_properties')}
-            className={`inline-flex items-center space-x-1.5 py-2 px-3 text-xs font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer rounded-t-md ${
+            className={`inline-flex items-center space-x-1 py-1.5 px-2.5 text-xs font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer rounded-t-md ${
               activeTab === 'sold_properties'
                 ? 'border-emerald-600 text-emerald-700 bg-emerald-50/60 font-bold'
                 : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -263,7 +263,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             type="button"
             onClick={() => onSelectTab('accounting')}
-            className={`inline-flex items-center space-x-1.5 py-2 px-3 text-xs font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer rounded-t-md ${
+            className={`inline-flex items-center space-x-1 py-1.5 px-2.5 text-xs font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer rounded-t-md ${
               activeTab === 'accounting'
                 ? 'border-blue-600 text-blue-700 bg-blue-50/60 font-bold'
                 : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -271,7 +271,7 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>会計科目突合・決算照合</span>
-            <span className="px-1.5 py-0.2 text-[9px] bg-blue-100 text-blue-700 border border-blue-200 rounded font-bold">
+            <span className="px-1 py-0.2 text-[9px] bg-blue-100 text-blue-700 border border-blue-200 rounded font-bold">
               照合
             </span>
           </button>
@@ -279,7 +279,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             type="button"
             onClick={() => onSelectTab('inventory')}
-            className={`inline-flex items-center space-x-1.5 py-2 px-3 text-xs font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer rounded-t-md ${
+            className={`inline-flex items-center space-x-1 py-1.5 px-2.5 text-xs font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer rounded-t-md ${
               activeTab === 'inventory'
                 ? 'border-emerald-600 text-emerald-700 bg-emerald-50/60 font-bold'
                 : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -292,7 +292,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             type="button"
             onClick={() => onSelectTab('transactions')}
-            className={`inline-flex items-center space-x-1.5 py-2 px-3 text-xs font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer rounded-t-md ${
+            className={`inline-flex items-center space-x-1 py-1.5 px-2.5 text-xs font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer rounded-t-md ${
               activeTab === 'transactions'
                 ? 'border-amber-600 text-amber-800 bg-amber-50/60 font-bold'
                 : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -310,7 +310,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             type="button"
             onClick={() => onSelectTab('rollover')}
-            className={`inline-flex items-center space-x-1.5 py-2 px-3 text-xs font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer rounded-t-md ${
+            className={`inline-flex items-center space-x-1 py-1.5 px-2.5 text-xs font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer rounded-t-md ${
               activeTab === 'rollover'
                 ? 'border-purple-600 text-purple-700 bg-purple-50/60 font-bold'
                 : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'

@@ -411,20 +411,19 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="bg-[#f8fafc] text-slate-700 font-bold border-b border-slate-200 text-[11px]">
                   <tr>
-                    <th className="py-2 px-2 w-8 text-center text-slate-400 font-mono">No</th>
                     <th
-                      className="py-2 px-2.5 cursor-pointer select-none hover:bg-slate-100 transition-colors whitespace-nowrap"
+                      className="py-2 px-1.5 cursor-pointer select-none hover:bg-slate-100 transition-colors whitespace-nowrap"
                       onClick={() => handleSort('code')}
                       title="物件コードで並び替え"
                     >
-                      <div className="flex items-center space-x-1">
+                      <div className="flex items-center space-x-0.5">
                         <span>物件コード</span>
                         <span className="no-print inline-flex">
                           {sortField === 'code' ? (
                             sortOrder === 'asc' ? (
-                              <ArrowUp className="w-3.5 h-3.5 text-blue-600" />
+                              <ArrowUp className="w-3 h-3 text-blue-600" />
                             ) : (
-                              <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                              <ArrowDown className="w-3 h-3 text-blue-600" />
                             )
                           ) : (
                             <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
@@ -432,23 +431,23 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
                         </span>
                       </div>
                     </th>
-                    <th className="py-2 px-2.5 min-w-[160px]">物件所在地・物件名</th>
-                    <th className="py-2 px-2 whitespace-nowrap">種類 / 地目</th>
-                    <th className="py-2 px-2 text-right whitespace-nowrap">土地面積</th>
-                    <th className="py-2 px-2 text-right whitespace-nowrap">建物面積</th>
+                    <th className="py-2 px-1.5">物件所在地・物件名</th>
+                    <th className="py-2 px-1.5 whitespace-nowrap">種類 / 地目</th>
+                    <th className="py-2 px-1.5 text-right whitespace-nowrap">土地面積</th>
+                    <th className="py-2 px-1.5 text-right whitespace-nowrap">建物面積</th>
                     <th
-                      className="py-2 px-2 col-date whitespace-nowrap cursor-pointer select-none hover:bg-slate-100 transition-colors w-[105px] min-w-[105px]"
+                      className="py-2 px-1.5 col-date whitespace-nowrap cursor-pointer select-none hover:bg-slate-100 transition-colors"
                       onClick={() => handleSort('date')}
                       title="取得日(仕入決済日)で並び替え"
                     >
-                      <div className="flex items-center space-x-1">
+                      <div className="flex items-center space-x-0.5">
                         <span>取得日</span>
                         <span className="no-print inline-flex">
                           {sortField === 'date' ? (
                             sortOrder === 'asc' ? (
-                              <ArrowUp className="w-3.5 h-3.5 text-blue-600" />
+                              <ArrowUp className="w-3 h-3 text-blue-600" />
                             ) : (
-                              <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                              <ArrowDown className="w-3 h-3 text-blue-600" />
                             )
                           ) : (
                             <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
@@ -456,21 +455,21 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
                         </span>
                       </div>
                     </th>
-                    <th className="py-2 px-2 text-center whitespace-nowrap">状態</th>
-                    <th className="py-2 px-2.5 text-right whitespace-nowrap">前期繰越原価</th>
+                    <th className="py-2 px-1.5 text-center whitespace-nowrap">状態</th>
+                    <th className="py-2 px-1.5 text-right whitespace-nowrap">前期繰越原価</th>
                     <th
-                      className="py-2 px-2.5 text-right whitespace-nowrap cursor-pointer select-none hover:bg-slate-100 transition-colors"
+                      className="py-2 px-1.5 text-right whitespace-nowrap cursor-pointer select-none hover:bg-slate-100 transition-colors"
                       onClick={() => handleSort('acquisition')}
                       title="総仕入原価で並び替え"
                     >
-                      <div className="flex items-center justify-end space-x-1">
+                      <div className="flex items-center justify-end space-x-0.5">
                         <span>総仕入原価</span>
                         <span className="no-print inline-flex">
                           {sortField === 'acquisition' ? (
                             sortOrder === 'asc' ? (
-                              <ArrowUp className="w-3.5 h-3.5 text-blue-600" />
+                              <ArrowUp className="w-3 h-3 text-blue-600" />
                             ) : (
-                              <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                              <ArrowDown className="w-3 h-3 text-blue-600" />
                             )
                           ) : (
                             <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
@@ -479,18 +478,18 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
                       </div>
                     </th>
                     <th
-                      className="py-2 px-2.5 text-right whitespace-nowrap cursor-pointer select-none hover:bg-slate-100 transition-colors"
+                      className="py-2 px-1.5 text-right whitespace-nowrap cursor-pointer select-none hover:bg-slate-100 transition-colors"
                       onClick={() => handleSort('cogs')}
                       title="計上売上原価で並び替え"
                     >
-                      <div className="flex items-center justify-end space-x-1">
+                      <div className="flex items-center justify-end space-x-0.5">
                         <span>計上売上原価</span>
                         <span className="no-print inline-flex">
                           {sortField === 'cogs' ? (
                             sortOrder === 'asc' ? (
-                              <ArrowUp className="w-3.5 h-3.5 text-blue-600" />
+                              <ArrowUp className="w-3 h-3 text-blue-600" />
                             ) : (
-                              <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                              <ArrowDown className="w-3 h-3 text-blue-600" />
                             )
                           ) : (
                             <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-60" />
@@ -499,18 +498,18 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
                       </div>
                     </th>
                     <th
-                      className="py-2 px-2.5 text-right whitespace-nowrap bg-emerald-50/70 text-emerald-900 cursor-pointer select-none hover:bg-emerald-100/80 transition-colors"
+                      className="py-2 px-1.5 text-right whitespace-nowrap bg-emerald-50/70 text-emerald-900 cursor-pointer select-none hover:bg-emerald-100/80 transition-colors"
                       onClick={() => handleSort('endingInventory')}
                       title="期末棚卸残高で並び替え"
                     >
-                      <div className="flex items-center justify-end space-x-1">
+                      <div className="flex items-center justify-end space-x-0.5">
                         <span className="font-bold">期末棚卸高</span>
                         <span className="no-print inline-flex">
                           {sortField === 'endingInventory' ? (
                             sortOrder === 'asc' ? (
-                              <ArrowUp className="w-3.5 h-3.5 text-emerald-800" />
+                              <ArrowUp className="w-3 h-3 text-emerald-800" />
                             ) : (
-                              <ArrowDown className="w-3.5 h-3.5 text-emerald-800" />
+                              <ArrowDown className="w-3 h-3 text-emerald-800" />
                             )
                           ) : (
                             <ArrowUpDown className="w-3 h-3 text-emerald-600 opacity-60" />
@@ -518,11 +517,11 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
                         </span>
                       </div>
                     </th>
-                    <th className="py-2 px-2 text-center w-16 no-print">操作</th>
+                    <th className="py-2 px-1.5 text-center whitespace-nowrap no-print">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-[11px]">
-                  {filteredAndSortedRows.map(({ property: prop, fin, landAreaNum, buildingAreaNum }, idx) => {
+                  {filteredAndSortedRows.map(({ property: prop, fin, landAreaNum, buildingAreaNum }) => {
                     const isExpanded = expandedRowIds.has(prop.id);
                     const statusBadge = getStatusBadgeClass(fin.status);
                     const typeBadge = getPropertyTypeBadgeClass(prop.propertyType);
@@ -530,6 +529,16 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
                       prop.sales?.some(s => s.costCalculationNote) ||
                       prop.initialInventoryNote ||
                       prop.notes;
+                    const compactStatusLabel =
+                      fin.status === 'inventory'
+                        ? '保有中(棚卸)'
+                        : fin.status === 'partially_sold'
+                        ? '一部売却済'
+                        : fin.status === 'deposit_paid'
+                        ? '手付支払済'
+                        : fin.status === 'contracted_unsettled'
+                        ? '仕入未決済'
+                        : '売却済(完売)';
 
                     return (
                       <React.Fragment key={prop.id}>
@@ -538,10 +547,7 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
                             fin.endingInventory <= 0 ? 'bg-slate-50/50 text-slate-500' : ''
                           }`}
                         >
-                          <td className="py-1.5 px-2 text-center text-slate-400 font-mono text-[10px]">
-                            {idx + 1}
-                          </td>
-                          <td className="py-1.5 px-2.5 whitespace-nowrap font-mono font-bold text-slate-800">
+                          <td className="py-1.5 px-1.5 whitespace-nowrap font-mono font-bold text-slate-800">
                             <button
                               type="button"
                               onClick={() => onSelectProperty(prop)}
@@ -551,15 +557,19 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
                               {prop.code}
                             </button>
                           </td>
-                          <td className="py-1.5 px-2.5">
-                            <div className="font-semibold text-slate-900">{prop.location || prop.name}</div>
+                          <td className="py-1.5 px-1.5">
+                            <div className="font-semibold text-slate-900 break-words leading-snug">
+                              {prop.location || prop.name}
+                            </div>
                             {prop.name && prop.name !== prop.location && (
-                              <div className="text-[10px] text-slate-400 truncate max-w-xs">{prop.name}</div>
+                              <div className="text-[10px] text-slate-400 break-words leading-tight">
+                                {prop.name}
+                              </div>
                             )}
                           </td>
-                          <td className="py-1.5 px-2 whitespace-nowrap">
+                          <td className="py-1.5 px-1.5 whitespace-nowrap">
                             <div className="flex items-center space-x-1">
-                              <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${typeBadge.bg} ${typeBadge.text} border ${typeBadge.border}`}>
+                              <span className={`px-1 py-0.2 rounded text-[10px] font-bold ${typeBadge.bg} ${typeBadge.text} border ${typeBadge.border}`}>
                                 {typeBadge.label}
                               </span>
                               {prop.landCategory && (
@@ -569,43 +579,46 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
                               )}
                             </div>
                           </td>
-                          <td className="py-1.5 px-2 text-right font-mono text-slate-800 whitespace-nowrap">
+                          <td className="py-1.5 px-1.5 text-right font-mono text-slate-800 whitespace-nowrap tracking-tight">
                             {landAreaNum !== undefined
                               ? `${landAreaNum.toLocaleString('ja-JP', { maximumFractionDigits: 2 })} ㎡`
                               : '-'}
                           </td>
-                          <td className="py-1.5 px-2 text-right font-mono text-slate-800 whitespace-nowrap">
+                          <td className="py-1.5 px-1.5 text-right font-mono text-slate-800 whitespace-nowrap tracking-tight">
                             {buildingAreaNum !== undefined
                               ? `${buildingAreaNum.toLocaleString('ja-JP', { maximumFractionDigits: 2 })} ㎡`
                               : '-'}
                           </td>
-                          <td className="py-1.5 px-2 col-date font-mono text-slate-700 whitespace-nowrap w-[105px] min-w-[105px]">
+                          <td className="py-1.5 px-1.5 col-date font-mono text-slate-700 whitespace-nowrap tracking-tight">
                             {prop.settlementDate || '-'}
                           </td>
-                          <td className="py-1.5 px-2 text-center whitespace-nowrap">
-                            <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${statusBadge.bg} ${statusBadge.text} border ${statusBadge.border}`}>
-                              {fin.statusLabel}
+                          <td className="py-1.5 px-1.5 text-center whitespace-nowrap">
+                            <span
+                              className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${statusBadge.bg} ${statusBadge.text} border ${statusBadge.border}`}
+                              title={fin.statusLabel}
+                            >
+                              {compactStatusLabel}
                             </span>
                           </td>
-                          <td className="py-1.5 px-2.5 text-right font-mono text-slate-700 whitespace-nowrap">
+                          <td className="py-1.5 px-1.5 text-right font-mono text-slate-700 whitespace-nowrap tracking-tight">
                             {formatCurrency(prop.initialInventoryCost || 0)}
                           </td>
-                          <td className="py-1.5 px-2.5 text-right font-mono font-semibold text-slate-900 whitespace-nowrap">
+                          <td className="py-1.5 px-1.5 text-right font-mono font-semibold text-slate-900 whitespace-nowrap tracking-tight">
                             {formatCurrency(fin.settledAcquisitionCost)}
                           </td>
-                          <td className="py-1.5 px-2.5 text-right font-mono text-amber-800 whitespace-nowrap">
+                          <td className="py-1.5 px-1.5 text-right font-mono text-amber-800 whitespace-nowrap tracking-tight">
                             {formatCurrency(fin.totalCostOfGoodsSold)}
                           </td>
-                          <td className="py-1.5 px-2.5 text-right font-mono font-bold text-emerald-800 bg-emerald-50/50 whitespace-nowrap text-xs">
+                          <td className="py-1.5 px-1.5 text-right font-mono font-bold text-emerald-800 bg-emerald-50/50 whitespace-nowrap tracking-tight text-xs">
                             {formatCurrency(fin.endingInventory)}
                           </td>
-                          <td className="py-1.5 px-2 text-center whitespace-nowrap no-print">
+                          <td className="py-1.5 px-1.5 text-center whitespace-nowrap no-print">
                             <div className="flex items-center justify-center space-x-1">
                               {hasNotes && (
                                 <button
                                   type="button"
                                   onClick={() => toggleRowExpand(prop.id)}
-                                  className="p-1 text-slate-500 hover:text-blue-700 hover:bg-slate-100 rounded cursor-pointer"
+                                  className="p-0.5 text-slate-500 hover:text-blue-700 hover:bg-slate-100 rounded cursor-pointer"
                                   title={isExpanded ? '計算メモを閉じる' : '売上原価の計算メモ・根拠を見る'}
                                 >
                                   {isExpanded ? (
@@ -618,7 +631,7 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
                               <button
                                 type="button"
                                 onClick={() => onSelectProperty(prop)}
-                                className="text-blue-600 hover:text-blue-900 font-bold underline cursor-pointer text-xs"
+                                className="text-blue-600 hover:text-blue-900 font-bold underline cursor-pointer text-[11px]"
                               >
                                 開く
                               </button>
@@ -629,7 +642,7 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
                         {/* Expand Row for Notes / Calculation Details */}
                         {isExpanded && (
                           <tr className="bg-slate-50/90 text-xs border-b border-slate-200 no-print">
-                            <td colSpan={13} className="py-2.5 px-4">
+                            <td colSpan={12} className="py-2.5 px-4">
                               <div className="bg-white p-3 rounded-md border border-slate-200 shadow-2xs space-y-2">
                                 <div className="font-bold text-slate-800 flex items-center space-x-1 text-xs">
                                   <FileText className="w-3.5 h-3.5 text-blue-600" />
@@ -690,30 +703,30 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
                 {/* Table Footer */}
                 <tfoot className="bg-slate-100/90 font-bold border-t-2 border-slate-300 text-slate-900 text-xs">
                   <tr>
-                    <td colSpan={4} className="py-2.5 px-2.5 text-center text-slate-700">
+                    <td colSpan={3} className="py-2.5 px-2 text-center text-slate-700">
                       期末棚卸 合計 ({filteredAndSortedRows.length}件)
                     </td>
-                    <td className="py-2.5 px-2 text-right font-mono text-slate-800 whitespace-nowrap">
+                    <td className="py-2.5 px-1.5 text-right font-mono text-slate-800 whitespace-nowrap tracking-tight">
                       {totals.landArea > 0
                         ? `${totals.landArea.toLocaleString('ja-JP', { maximumFractionDigits: 2 })} ㎡`
                         : '-'}
                     </td>
-                    <td className="py-2.5 px-2 text-right font-mono text-slate-800 whitespace-nowrap">
+                    <td className="py-2.5 px-1.5 text-right font-mono text-slate-800 whitespace-nowrap tracking-tight">
                       {totals.buildingArea > 0
                         ? `${totals.buildingArea.toLocaleString('ja-JP', { maximumFractionDigits: 2 })} ㎡`
                         : '-'}
                     </td>
                     <td colSpan={2}></td>
-                    <td className="py-2.5 px-2.5 text-right font-mono text-slate-800 whitespace-nowrap">
+                    <td className="py-2.5 px-1.5 text-right font-mono text-slate-800 whitespace-nowrap tracking-tight">
                       {formatCurrency(totals.initialInventory)}
                     </td>
-                    <td className="py-2.5 px-2.5 text-right font-mono text-slate-900 whitespace-nowrap font-bold">
+                    <td className="py-2.5 px-1.5 text-right font-mono text-slate-900 whitespace-nowrap tracking-tight font-bold">
                       {formatCurrency(totals.totalAcquisition)}
                     </td>
-                    <td className="py-2.5 px-2.5 text-right font-mono text-amber-900 whitespace-nowrap font-bold">
+                    <td className="py-2.5 px-1.5 text-right font-mono text-amber-900 whitespace-nowrap tracking-tight font-bold">
                       {formatCurrency(totals.cogs)}
                     </td>
-                    <td className="py-2.5 px-2.5 text-right font-mono text-emerald-900 bg-emerald-100/70 whitespace-nowrap font-bold text-sm">
+                    <td className="py-2.5 px-1.5 text-right font-mono text-emerald-900 bg-emerald-100/70 whitespace-nowrap tracking-tight font-bold text-sm">
                       {formatCurrency(totals.endingInventory)}
                     </td>
                     <td className="no-print"></td>
