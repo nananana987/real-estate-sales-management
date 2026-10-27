@@ -638,26 +638,33 @@ export const InventoryReportView: React.FC<InventoryReportViewProps> = ({
 
                                 {prop.sales && prop.sales.length > 0 ? (
                                   <div className="space-y-1.5 pl-1">
-                                    {prop.sales.map((sale, sIdx) => (
-                                      <div
-                                        key={sale.id}
-                                        className="bg-slate-50 p-2 rounded border border-slate-200 text-slate-700 text-[11px]"
-                                      >
-                                        <div className="flex items-center justify-between font-semibold text-slate-900">
-                                          <span>
-                                            【売上#{sIdx + 1}】 {sale.buyerName} 様{' '}
-                                            {sale.partialSaleName ? `(${sale.partialSaleName})` : ''}
-                                            {sale.settlementDate && ` [決済: ${sale.settlementDate}]`}
-                                          </span>
-                                          <span className="font-mono text-amber-800 font-bold">
-                                            計上売上原価: {formatCurrency(sale.costOfGoodsSold)}
-                                          </span>
+                                    {prop.sales.map((sale, sIdx) => {
+                                      const isSaleSettled = Boolean(sale.settlementDate && sale.settlementDate.trim());
+                                      return (
+                                        <div
+                                          key={sale.id}
+                                          className="bg-slate-50 p-2 rounded border border-slate-200 text-slate-700 text-[11px]"
+                                        >
+                                          <div className="flex items-center justify-between font-semibold text-slate-900">
+                                            <span>
+                                              【売上#{sIdx + 1}】 {sale.buyerName} 様{' '}
+                                              {sale.partialSaleName ? `(${sale.partialSaleName})` : ''}
+                                              {isSaleSettled ? (
+                                                <span className="ml-1 text-emerald-700">[決済: {sale.settlementDate}]</span>
+                                              ) : (
+                                                <span className="ml-1 text-amber-700">[未決済（期末棚卸高は未控除）]</span>
+                                              )}
+                                            </span>
+                                            <span className="font-mono text-amber-800 font-bold">
+                                              {isSaleSettled ? '計上売上原価' : '予定売上原価(未決済)'}: {formatCurrency(sale.costOfGoodsSold)}
+                                            </span>
+                                          </div>
+                                          <p className="text-slate-600 mt-1 leading-relaxed">
+                                            {sale.costCalculationNote || '売上原価の計算メモは未登録です。'}
+                                          </p>
                                         </div>
-                                        <p className="text-slate-600 mt-1 leading-relaxed">
-                                          {sale.costCalculationNote || '売上原価の計算メモは未登録です。'}
-                                        </p>
-                                      </div>
-                                    ))}
+                                      );
+                                    })}
                                   </div>
                                 ) : (
                                   <p className="text-slate-500 text-[11px]">

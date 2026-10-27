@@ -468,12 +468,20 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 text-slate-600 bg-slate-50 p-2 rounded text-[11px]">
                       <div>契約日: {sale.contractDate || '-'}</div>
-                      <div>決済日: {sale.settlementDate || '未決済'}</div>
+                      <div>
+                        決済日:{' '}
+                        {sale.settlementDate && sale.settlementDate.trim() ? (
+                          <span className="font-semibold text-emerald-700">{sale.settlementDate}</span>
+                        ) : (
+                          <span className="font-bold text-amber-700">未決済 (棚卸未控除)</span>
+                        )}
+                      </div>
                       <div>
                         土地売上: {formatCurrency(sale.landPrice)}
                       </div>
                       <div>
-                        計上原価: {formatCurrency(sale.costOfGoodsSold)}
+                        {sale.settlementDate && sale.settlementDate.trim() ? '計上原価' : '予定原価(未決済)'}:{' '}
+                        {formatCurrency(sale.costOfGoodsSold)}
                       </div>
                     </div>
 

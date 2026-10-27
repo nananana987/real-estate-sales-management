@@ -287,14 +287,17 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
     return acc + (s.landPrice || 0) + (s.buildingPrice || 0) + taxTotal;
   }, 0);
 
-  const totalCOGS = sales.reduce((acc, s) => acc + (s.costOfGoodsSold || 0), 0);
+  const settledCOGS = sales
+    .filter(s => Boolean(s.settlementDate && s.settlementDate.trim()))
+    .reduce((acc, s) => acc + (Number(s.costOfGoodsSold) || 0), 0);
+  const totalCOGS = settledCOGS;
   const hasSettledFullSale = sales.some(
     s => Boolean(s.settlementDate && s.settlementDate.trim()) && s.saleCategory === 'full'
   );
   const endingInventory =
     !hasSettledInventoryBase || hasSettledFullSale
       ? 0
-      : Math.max(0, settledAcquisition - totalCOGS);
+      : Math.max(0, settledAcquisition - settledCOGS);
 
   // 複数仕入レコードの追加・更新・削除ハンドラー
   const handleAddPurchase = () => {
@@ -2139,6 +2142,15 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                                   全部売却 (一括完売)
                                 </span>
                               )}
+                              {sale.settlementDate && sale.settlementDate.trim() ? (
+                                <span className="ml-1.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  決済済 ({sale.settlementDate})
+                                </span>
+                              ) : (
+                                <span className="ml-1.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                  未決済 (棚卸高未減算)
+                                </span>
+                              )}
                               {sale.attachments && sale.attachments.length > 0 && (
                                 <span className="ml-1.5 inline-flex items-center space-x-0.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
                                   <Paperclip className="w-2.5 h-2.5" />
@@ -2480,7 +2492,9 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                                   onChange={val => handleUpdateSaleField(index, 'settlementDate', val)}
                                   placeholder="例: 260630"
                                 />
-                                <p className="text-[10px] text-slate-400 mt-0.5">※後から入力可能</p>
+                                <p className="text-[10px] text-slate-500 mt-0.5">
+                                  ※後から入力可能（決済日の入力後に期末棚卸高から減算されます）
+                                </p>
                               </div>
                             </div>
 

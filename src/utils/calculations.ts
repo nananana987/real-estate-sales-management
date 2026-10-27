@@ -308,8 +308,8 @@ export function determinePropertyStatus(property: Property): { status: PropertyS
     ? initialInventoryCost + settledPurchaseCost + settledIncidentalCost
     : 0;
 
-  const totalCOGS = (property.sales || []).reduce((acc, s) => acc + (s.costOfGoodsSold || 0), 0);
-  const remainingInventory = Math.max(0, settledBaseCost - totalCOGS);
+  const settledCOGS = settledSales.reduce((acc, s) => acc + (s.costOfGoodsSold || 0), 0);
+  const remainingInventory = Math.max(0, settledBaseCost - settledCOGS);
   const hasUnsettledPurchase = purchases.some(
     p =>
       !p.settlementDate ||
@@ -564,17 +564,18 @@ export function calculatePropertyFinancials(property: Property, fy: FiscalYear):
     return acc + (s.landPrice || 0) + (s.buildingPrice || 0) + sTax.total;
   }, 0);
 
-  // 計上売上原価累計
-  const totalCostOfGoodsSold = sales.reduce((acc, s) => acc + (s.costOfGoodsSold || 0), 0);
+  // 計上売上原価累計（決済済の売上のみ対象。未決済の売上は期末棚卸高から控除しない）
+  const settledCostOfGoodsSold = settledSales.reduce((acc, s) => acc + (s.costOfGoodsSold || 0), 0);
+  const totalCostOfGoodsSold = settledCostOfGoodsSold;
 
-  // 現在の期末棚卸残高 (完売時または未決済時は0、それ以外は決済済仕入原価から計上売上原価を控除した残高)
+  // 現在の期末棚卸残高 (完売時または未決済時は0、それ以外は決済済仕入原価から決済済計上売上原価を控除した残高)
   const endingInventory =
     status === 'sold_out' || isUnsettledProperty
       ? 0
-      : Math.max(0, settledAcquisitionCost - totalCostOfGoodsSold);
+      : Math.max(0, settledAcquisitionCost - settledCostOfGoodsSold);
 
   // 粗利 (決済ベース)
-  const grossProfit = settledSalesAmount - totalCostOfGoodsSold;
+  const grossProfit = settledSalesAmount - settledCostOfGoodsSold;
   const grossProfitMargin = settledSalesAmount > 0 ? (grossProfit / settledSalesAmount) * 100 : 0;
 
   // --- 当期判定 (事業年度 fy に基づく計算) ---
