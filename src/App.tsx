@@ -385,7 +385,7 @@ export default function App() {
   }, [currentPeriodProperties, searchQuery, statusFilter, periodFilter, sortOption, currentFY]);
 
   return (
-    <div className="min-h-screen bg-slate-50/70 text-slate-900 flex flex-col font-sans text-xs">
+    <div className="min-h-screen bg-slate-50/70 text-slate-900 flex flex-col font-sans text-sm">
       {/* Local File Notification Banner (アクセス許可要求・保存エラー・未選択案内) */}
       <LocalFileNotificationBanner
         fileName={localFileName}
@@ -445,7 +445,7 @@ export default function App() {
       />
 
       {/* Main Container */}
-      <main className="flex-1 max-w-[1440px] w-full mx-auto px-3 sm:px-4 lg:px-6 py-3.5 space-y-3.5">
+      <main className="flex-1 max-w-[1600px] w-full mx-auto px-3 sm:px-4 lg:px-6 py-3.5 space-y-3.5">
         {/* KPI Financial Overview Ribbon (High Density Modern Financial) */}
         <div id="kpi-overview-ribbon" className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5 no-print">
           {/* 1. 当期仕入高 */}
@@ -471,15 +471,15 @@ export default function App() {
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div className="bg-slate-50/80 px-2.5 py-1.5 rounded border border-slate-100 flex sm:block items-baseline justify-between gap-2">
+              <div className="bg-slate-50/80 px-2.5 py-1.5 rounded border border-slate-100 flex sm:block items-baseline justify-between gap-2 min-w-0">
                 <span className="text-[10px] text-slate-500 block font-medium whitespace-nowrap">土地売上</span>
-                <span className="text-sm font-bold text-emerald-800 font-mono block whitespace-nowrap">
+                <span className="text-sm font-bold text-emerald-800 font-mono block whitespace-nowrap tracking-tight">
                   {formatCurrency(accountingSummary.salesLandTotal)}
                 </span>
               </div>
-              <div className="bg-slate-50/80 px-2.5 py-1.5 rounded border border-slate-100 flex sm:block items-baseline justify-between gap-2">
+              <div className="bg-slate-50/80 px-2.5 py-1.5 rounded border border-slate-100 flex sm:block items-baseline justify-between gap-2 min-w-0">
                 <span className="text-[10px] text-slate-500 block font-medium whitespace-nowrap">建物売上</span>
-                <span className="text-sm font-bold text-teal-800 font-mono block whitespace-nowrap">
+                <span className="text-sm font-bold text-teal-800 font-mono block whitespace-nowrap tracking-tight">
                   {formatCurrency(accountingSummary.salesBuildingTotal)}
                 </span>
               </div>

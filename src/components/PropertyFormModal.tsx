@@ -276,10 +276,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
   const settledIncidentalTotal = incidentalCosts
     .filter(c => Boolean(c.paymentDate && c.paymentDate.trim()))
     .reduce((acc, c) => acc + (c.amount || 0), 0);
-  const hasSettledInventoryBase = hasAnySettledPurchase || curInitialCost > 0;
-  const settledAcquisition = hasSettledInventoryBase
-    ? curInitialCost + settledPurchasesTotal + settledIncidentalTotal
-    : 0;
+  const settledAcquisition = curInitialCost + settledPurchasesTotal + settledIncidentalTotal;
 
   const totalSalesAmount = sales.reduce((acc, s) => {
     const sTax = (s.fixedAssetTaxSettlementLand || 0) + (s.fixedAssetTaxSettlementBuilding || 0);
@@ -294,10 +291,9 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
   const hasSettledFullSale = sales.some(
     s => Boolean(s.settlementDate && s.settlementDate.trim()) && s.saleCategory === 'full'
   );
-  const endingInventory =
-    !hasSettledInventoryBase || hasSettledFullSale
-      ? 0
-      : Math.max(0, settledAcquisition - settledCOGS);
+  const endingInventory = hasSettledFullSale
+    ? 0
+    : Math.max(0, settledAcquisition - settledCOGS);
 
   // 複数仕入レコードの追加・更新・削除ハンドラー
   const handleAddPurchase = () => {

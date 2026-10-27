@@ -3,6 +3,18 @@
 @theme {
   --font-sans: "UD Digi Kyokasho N-R", "UD デジタル 教科書体 N-R", "BIZ UDGothic", sans-serif;
   --font-mono: "UD Digi Kyokasho N-R", "UD デジタル 教科書体 N-R", "BIZ UDGothic", sans-serif;
+  --text-xs: 0.875rem;
+  --text-xs--line-height: 1.3rem;
+  --text-sm: 1rem;
+  --text-sm--line-height: 1.5rem;
+  --text-base: 1.125rem;
+  --text-base--line-height: 1.65rem;
+  --text-lg: 1.25rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.5rem;
+  --text-xl--line-height: 2rem;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 2.25rem;
 }
 
 html,
@@ -14,6 +26,21 @@ textarea,
 .font-sans,
 .font-mono {
   font-family: "UD Digi Kyokasho N-R", "UD デジタル 教科書体 N-R", "BIZ UDGothic", sans-serif;
+}
+
+@media screen {
+  .text-\[9px\] {
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  .text-\[10px\] {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .text-\[11px\] {
+    font-size: 13px;
+    line-height: 1.45;
+  }
 }
 
 @media print {

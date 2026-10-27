@@ -100,7 +100,7 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="bg-white text-slate-900 border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
       {/* Top Banner */}
-      <div className="max-w-[1440px] mx-auto px-3 sm:px-4 lg:px-6">
+      <div className="max-w-[1600px] mx-auto px-3 sm:px-4 lg:px-6">
         <div className="flex items-center justify-between h-14">
           {/* Logo & Title */}
           <div className="flex items-center space-x-3">

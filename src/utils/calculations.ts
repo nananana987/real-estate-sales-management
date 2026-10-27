@@ -303,10 +303,7 @@ export function determinePropertyStatus(property: Property): { status: PropertyS
     .reduce((acc, c) => acc + (c.amount || 0), 0);
 
   const initialInventoryCost = property.initialInventoryCost || 0;
-  const hasInventoryBase = hasSettledPurchase || initialInventoryCost > 0;
-  const settledBaseCost = hasInventoryBase
-    ? initialInventoryCost + settledPurchaseCost + settledIncidentalCost
-    : 0;
+  const settledBaseCost = initialInventoryCost + settledPurchaseCost + settledIncidentalCost;
 
   const settledCOGS = settledSales.reduce((acc, s) => acc + (s.costOfGoodsSold || 0), 0);
   const remainingInventory = Math.max(0, settledBaseCost - settledCOGS);
@@ -481,8 +478,8 @@ export function getStatusBadgeClass(status: PropertyStatus): { bg: string; text:
 
 /**
  * 物件の各種金額・当期取引金額・棚卸金額を精密計算
- * ※未決済の仕入金額（settlementDateが空）および未払の付随費用（paymentDateが空）、
- *   ならびに未決済物件の付随費用は期末棚卸残高（endingInventory）には含めない
+ * ※未決済の仕入金額（settlementDateが空）および未払の付随費用（paymentDateが空）は期末棚卸残高（endingInventory）には含めない。
+ *   仕入本体が未決済であっても、支払済みの付随費用（paymentDate入力済）がある場合は期末棚卸残高に含める。
  */
 export function calculatePropertyFinancials(property: Property, fy: FiscalYear): PropertyFinancials {
   const { status, label } = determinePropertyStatus(property);
@@ -538,17 +535,9 @@ export function calculatePropertyFinancials(property: Property, fy: FiscalYear):
   );
   const unpaidIncidentalCostsTotal = incidentalCostsTotal - settledIncidentalCostsTotal;
 
-  // 物件自体に決済済みの仕入（または前期繰越残高）があるか
-  const hasSettledInventoryBase = settledPurchases.length > 0 || initialInventoryCost > 0;
-  const isUnsettledProperty =
-    !hasSettledInventoryBase ||
-    status === 'contracted_unsettled' ||
-    status === 'deposit_paid';
-
-  // 棚卸算定ベースとなる決済済総仕入原価（未決済の仕入金額や未払の付随費用、未決済物件の費用は含めない）
-  const settledAcquisitionCost = isUnsettledProperty
-    ? 0
-    : initialInventoryCost + settledPurchaseBaseTotal + settledIncidentalCostsTotal;
+  // 棚卸算定ベースとなる決済済総仕入原価（未決済の仕入金額や未払の付随費用は含めない。仕入本体が未決済でも支払済みの付随費用は含める）
+  const settledAcquisitionCost =
+    initialInventoryCost + settledPurchaseBaseTotal + settledIncidentalCostsTotal;
 
   // 売上累計
   const sales = property.sales || [];
@@ -568,9 +557,9 @@ export function calculatePropertyFinancials(property: Property, fy: FiscalYear):
   const settledCostOfGoodsSold = settledSales.reduce((acc, s) => acc + (s.costOfGoodsSold || 0), 0);
   const totalCostOfGoodsSold = settledCostOfGoodsSold;
 
-  // 現在の期末棚卸残高 (完売時または未決済時は0、それ以外は決済済仕入原価から決済済計上売上原価を控除した残高)
+  // 現在の期末棚卸残高 (完売時は0、それ以外は決済済仕入原価[前期繰越+決済済仕入本体+支払済付随費用]から決済済計上売上原価を控除した残高)
   const endingInventory =
-    status === 'sold_out' || isUnsettledProperty
+    status === 'sold_out'
       ? 0
       : Math.max(0, settledAcquisitionCost - settledCostOfGoodsSold);
 
@@ -687,9 +676,12 @@ export function calculateAccountingSummary(properties: Property[], fy: FiscalYea
     if (property.initialInventoryCost && property.initialInventoryCost > 0) {
       beginningInventoryTotal += property.initialInventoryCost;
     } else {
-      // もし前期以前に決済され、前期末時点で売却されていなかった場合の仕入原価
+      // もし前期以前に決済された仕入または支払済みの付随費用があり、前期末時点で残高があった場合の原価
       const prevPurchases = purchases.filter(p => isDateBeforeFiscalYear(p.settlementDate, fy));
-      if (prevPurchases.length > 0) {
+      const prevCosts = (property.incidentalCosts || [])
+        .filter(c => isDateBeforeFiscalYear(c.paymentDate, fy))
+        .reduce((sum, c) => sum + (c.amount || 0), 0);
+      if (prevPurchases.length > 0 || prevCosts > 0) {
         const prevBase = prevPurchases.reduce((sum, p) => {
           const pTax = getPurchaseRecordFixedAssetTax(p);
           return (
@@ -700,10 +692,6 @@ export function calculateAccountingSummary(properties: Property[], fy: FiscalYea
             pTax.total
           );
         }, 0);
-        // 前期以前の付随費用
-        const prevCosts = (property.incidentalCosts || [])
-          .filter(c => isDateBeforeFiscalYear(c.paymentDate, fy))
-          .reduce((sum, c) => sum + (c.amount || 0), 0);
         // 前期以前の売上原価
         const prevCOGS = (property.sales || [])
           .filter(s => isDateBeforeFiscalYear(s.settlementDate, fy))
